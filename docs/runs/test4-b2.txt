@@ -1,0 +1,30 @@
+== Interface MTU
+EKS pod eth0: 9001
+AKS pod eth0: 1500
+
+== Path MTU with DF set (largest payload + 28 bytes of headers)
+AWS -> Azure: payload 1394  =>  path MTU 1422
+Azure -> AWS: payload 1392  =>  path MTU 1420
+One byte too big, AWS -> Azure:
+
+command terminated with exit code 1
+
+== tracepath AWS -> Azure
+ 1:  10.10.2.10                                            0.121ms asymm  2 
+ 2:  10.10.0.1                                             0.122ms pmtu 1500
+ 2:  169.254.3.1                                           5.122ms pmtu 1422
+ 2:  10.20.0.4                                            36.172ms 
+ 3:  10.20.32.64                                          46.071ms reached
+     Resume: pmtu 1422 hops 3 back 3 
+
+== TCP MSS: SYN as sent by the EKS pod vs as received by the AKS pod
+sent     : mss 8961
+received : mss 1310
+
+== TCP MSS, reverse: SYN sent by the AKS pod vs received by the EKS pod
+sent     : 
+received : 
+
+== TCP MSS, reverse: SYN sent by the AKS pod vs received by the EKS pod
+sent     : mss 1460
+received : mss 1360

@@ -1,0 +1,13 @@
+# Public Standard LB on the static IP created in terraform/azure/aks.
+# The LB probe uses the shallow /live check; the deep /health check belongs to Route 53.
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: cloudbridge
+  annotations:
+    service.beta.kubernetes.io/azure-pip-name: cloudbridge-frontend-pip
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: cloudbridge-rg
+    service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: /live
+spec:
+  type: LoadBalancer

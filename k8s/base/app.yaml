@@ -1,0 +1,128 @@
+# Shared by both clouds. Overlays set the image, CLOUD, BACKEND_URL, and load balancers.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cloudbridge
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: cloudbridge
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: backend }
+  template:
+    metadata:
+      labels: { app: backend }
+    spec:
+      # Spread replicas over nodes and zones so one failure never takes them all.
+      # ScheduleAnyway: during a node failure, pods may double up rather than stay Pending.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: backend } }
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: backend } }
+      containers:
+        - name: app
+          image: cloudbridge-app # replaced per cloud by the overlay
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: ROLE, value: backend }
+            - { name: CLOUD, value: unknown }
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+          livenessProbe:
+            httpGet: { path: /live, port: 8080 }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: cloudbridge
+spec:
+  selector: { app: backend }
+  ports: [{ port: 8080, targetPort: 8080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: cloudbridge
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: frontend }
+  template:
+    metadata:
+      labels: { app: frontend }
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: frontend } }
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: frontend } }
+      containers:
+        - name: app
+          image: cloudbridge-app
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: ROLE, value: frontend }
+            - { name: CLOUD, value: unknown }
+            - { name: BACKEND_URL, value: "http://backend:8080" }
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+          # Readiness = "can I serve?" (needs the backend). Liveness = "am I stuck?" (never
+          # checks dependencies, so a backend outage doesn't trigger pointless restarts).
+          # Default probe timers (10 s period, 3 failures) are kept for the baseline test.
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+          livenessProbe:
+            httpGet: { path: /live, port: 8080 }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: cloudbridge
+spec:
+  selector: { app: frontend }
+  ports: [{ port: 80, targetPort: 8080 }]
+---
+# Voluntary disruptions (drains, upgrades) must leave at least 2 of 3 replicas running
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend
+  namespace: cloudbridge
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels: { app: backend }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend
+  namespace: cloudbridge
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels: { app: frontend }

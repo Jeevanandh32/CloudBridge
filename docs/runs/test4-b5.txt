@@ -1,0 +1,14 @@
+== Setup: fault endpoints on, ALB idle timeout 5 s
+
+== Normal request
+GET /            -> 200 in 0.119812s  server: uvicorn
+
+== 504: slow target (10 s > 5 s idle timeout)
+GET /slow?s=10   -> 504 in 5.131012s  server: awselb/2.0
+
+== 502: target dies mid-request
+GET /crash       -> 502 in 0.162656s  server: awselb/2.0
+   pod restarts: 0 0 1 
+
+== 503: no targets (frontend scaled to 0)
+GET /            -> 503 in 0.137402s  server: awselb/2.0

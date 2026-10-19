@@ -1,0 +1,21 @@
+== Baseline
+AWS -> Azure TCP 5201 : OK
+Azure -> AWS TCP 9090 : OK
+AWS -> Azure ping     : OK
+
+== Break: NACL acl-00b5dc7b22d5df82e rule 50: DENY inbound TCP 32768-65535 from the Azure VNet
+enforced after: 3 s
+AWS -> Azure TCP 5201 : OK
+Azure -> AWS TCP 9090 : OK
+AWS -> Azure ping     : OK
+-- NACL inbound rules:
+50	deny	6	10.20.0.0/16	32768	65535
+100	allow	-1	0.0.0.0/0	None	None
+101	allow	-1	None	None	None
+32767	deny	-1	0.0.0.0/0	None	None
+
+== Fix: remove the rule
+removed after: 1 s
+AWS -> Azure TCP 5201 : OK
+Azure -> AWS TCP 9090 : OK
+AWS -> Azure ping     : OK

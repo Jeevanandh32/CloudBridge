@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: cloudbridge-app
+    newName: REGISTRY/cloudbridge-app  # filled in by k8s/deploy.sh from Terraform outputs
+    newTag: v1
+patches:
+  - path: frontend-lb.yaml
+  # Set CLOUD=azure on both deployments (env index 1 in the base)
+  - target: { kind: Deployment }
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/1/value
+        value: azure

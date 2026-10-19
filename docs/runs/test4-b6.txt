@@ -1,0 +1,26 @@
+== Node capacity (allocatable pods) and ENIs
+NODE                                        TYPE        MAX_PODS   CPU
+ip-10-10-2-10.us-east-2.compute.internal    t3.medium   17         1930m
+ip-10-10-33-32.us-east-2.compute.internal   t3.medium   17         1930m
+i-0e4e1a5636e993cef: 2 ENIs, 12 IPs in use
+i-03c3b13c8b1ba4d78: 3 ENIs, 18 IPs in use
+-- running pods per node:
+   8 ip-10-10-2-10.us-east-2.compute.internal
+   9 ip-10-10-33-32.us-east-2.compute.internal
+
+== Scale backend 3 -> 30
+backend pods by phase:
+  10 Pending
+  20 Running
+-- running pods per node:
+  17 ip-10-10-2-10.us-east-2.compute.internal
+  17 ip-10-10-33-32.us-east-2.compute.internal
+-- why a Pending pod is stuck:
+FailedScheduling   0/2 nodes are available: 2 Too many pods. no new claims to deallocate, preemption: 0/2 nodes are available: 2 No preemption victims found for incoming pod.
+-- CPU requested vs allocatable (to show CPU is NOT the limit):
+  cpu                800m (41%)   0 (0%)
+  memory             832Mi (25%)  1664Mi (50%)
+  cpu                850m (44%)   0 (0%)
+  memory             780Mi (23%)  1620Mi (49%)
+
+== Restore: backend -> 3

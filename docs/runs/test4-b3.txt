@@ -1,0 +1,38 @@
+== Baseline
+10.10.0.0/16	local	CreateRouteTable
+0.0.0.0/0	nat-0d2ce56068bf77c70	CreateRoute
+10.20.0.0/16	vgw-0629d5de63f3b1467	EnableVgwRoutePropagation
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+
+== Break: disable VGW route propagation on rtb-0d8a7b358f76c2ce8
+10.10.0.0/16	local	CreateRouteTable
+0.0.0.0/0	nat-0d2ce56068bf77c70	CreateRoute
+3 packets transmitted, 0 received, 100% packet loss, time 2119ms
+-- tunnels (still fine):
+18.221.20.199	UP	1 BGP ROUTES
+77.112.118.186	UP	1 BGP ROUTES
+-- Azure still has a route back to AWS (only one direction is broken):
+10.10.0.0/16	169.254.22.1
+10.10.0.0/16	169.254.21.1
+-- Reachability Analyzer (broken):
+-------------------------------------------------------
+|           DescribeNetworkInsightsAnalyses           |
++-----------+------------+----------------------------+
+| component | reachable  |            why             |
++-----------+------------+----------------------------+
+|  None     |  False     |  NO_ROUTE_TO_DESTINATION   |
++-----------+------------+----------------------------+
+
+== Fix: re-enable propagation
+10.10.0.0/16	local	CreateRouteTable
+0.0.0.0/0	nat-0d2ce56068bf77c70	CreateRoute
+10.20.0.0/16	vgw-0629d5de63f3b1467	EnableVgwRoutePropagation
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+-- Reachability Analyzer (fixed):
+------------------------------------
+|  DescribeNetworkInsightsAnalyses |
++------------+-------------+-------+
+|  component |  reachable  |  why  |
++------------+-------------+-------+
+|  None      |  True       |  None |
++------------+-------------+-------+

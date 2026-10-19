@@ -1,0 +1,14 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+terraform/backend.hcl
+crash.log
+.terraform.lock.hcl.bak
+# Saved plans can contain secrets (e.g., VPN PSKs)
+*.tfplan
+.DS_Store
+# Personal study guide: kept local, not published
+PROJECT.md
+PROJECT.pdf

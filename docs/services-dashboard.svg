@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1030" viewBox="0 0 1400 1030" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif">
+  <defs>
+    <style>
+      .title { font-size: 26px; font-weight: 700; fill: #16191f; }
+      .sub { font-size: 14px; fill: #545b64; }
+      .panel-h { font-size: 18px; font-weight: 700; fill: #ffffff; }
+      .panel-s { font-size: 12px; fill: #ffffff; opacity: 0.9; }
+      .card { fill: #ffffff; stroke: #d5dbdb; stroke-width: 1; }
+      .ct { font-size: 14px; font-weight: 700; fill: #16191f; }
+      .cd { font-size: 11.5px; fill: #545b64; }
+      .cost { font-size: 11px; font-weight: 700; }
+      .ic { font-size: 11px; font-weight: 700; fill: #ffffff; }
+      .lbl { font-size: 11px; fill: #16191f; }
+      .lblb { font-size: 11px; font-weight: 700; fill: #16191f; }
+      .foot-h { font-size: 13px; font-weight: 700; fill: #16191f; }
+      .foot { font-size: 12px; fill: #545b64; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="1030" fill="#f2f3f3"/>
+
+  <!-- Title -->
+  <text x="30" y="44" class="title">CloudBridge — services in use</text>
+  <text x="30" y="68" class="sub">Multi-cloud AWS + Azure, all built with Terraform · costs are approximate on-demand rates while running</text>
+
+  <!-- Global: Route 53 -->
+  <rect x="30" y="88" width="1340" height="92" rx="10" fill="#ffffff" stroke="#8c4fff" stroke-width="2"/>
+  <rect x="46" y="106" width="56" height="56" rx="8" fill="#8c4fff"/>
+  <text x="74" y="139" class="ic" text-anchor="middle">R53</text>
+  <text x="118" y="118" class="ct">Amazon Route 53 — global failover for app.jeevs.click</text>
+  <text x="118" y="139" class="cd">PRIMARY: alias → AWS ALB (TTL 60 s)   ·   SECONDARY: A → Azure LB static IP (TTL 30 s)   ·   Registered domain jeevs.click (auto-renew off)</text>
+  <text x="118" y="158" class="cd">2 health checks on the deep /health endpoint, every 10 s, 3 failures → unhealthy, ~16 global checkers   ·   Data plane only: no control-plane call needed to fail over</text>
+  <text x="1352" y="118" class="cost" fill="#8c4fff" text-anchor="end">~$4.25/mo + $3/yr domain</text>
+
+  <!-- ===================== AWS panel ===================== -->
+  <rect x="30" y="200" width="620" height="660" rx="10" fill="#ffffff" fill-opacity="0.55" stroke="#ff9900" stroke-width="2"/>
+  <rect x="30" y="200" width="620" height="44" rx="10" fill="#ff9900"/>
+  <rect x="30" y="230" width="620" height="14" fill="#ff9900"/>
+  <text x="48" y="228" class="panel-h">AWS · us-east-2 (Ohio)</text>
+  <text x="632" y="228" class="panel-s" text-anchor="end">≈ $0.33/hr running</text>
+
+  <!-- row 0 -->
+  <g transform="translate(45,258)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#7b61ff"/><text x="34" y="41" class="ic" text-anchor="middle">VPC</text><text x="66" y="27" class="ct">VPC</text><text x="278" y="27" class="cost" fill="#2e9e5b" text-anchor="end">free</text><text x="66" y="45" class="cd">10.10.0.0/16 across 2 AZs</text><text x="66" y="61" class="cd">DNS support + hostnames on</text></g>
+  <g transform="translate(345,258)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#7b61ff"/><text x="34" y="41" class="ic" text-anchor="middle">SUB</text><text x="66" y="27" class="ct">Subnets ×4</text><text x="278" y="27" class="cost" fill="#2e9e5b" text-anchor="end">free</text><text x="66" y="45" class="cd">private /19 ×2 (nodes + pods)</text><text x="66" y="61" class="cd">public /24 ×2 (NAT, ALB), LB tags</text></g>
+  <!-- row 1 -->
+  <g transform="translate(45,342)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#7b61ff"/><text x="34" y="41" class="ic" text-anchor="middle">IGW</text><text x="66" y="27" class="ct">Internet gateway</text><text x="278" y="27" class="cost" fill="#2e9e5b" text-anchor="end">free</text><text x="66" y="45" class="cd">0.0.0.0/0 for public subnets</text><text x="66" y="61" class="cd">path for the public ALB</text></g>
+  <g transform="translate(345,342)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#7b61ff"/><text x="34" y="41" class="ic" text-anchor="middle">NAT</text><text x="66" y="27" class="ct">NAT gateway ×1</text><text x="278" y="27" class="cost" fill="#d13212" text-anchor="end">$0.045/hr</text><text x="66" y="45" class="cd">single NAT for both AZs (cost)</text><text x="66" y="61" class="cd">egress for nodes, ECR, SSM</text></g>
+  <!-- row 2 -->
+  <g transform="translate(45,426)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#7b61ff"/><text x="34" y="41" class="ic" text-anchor="middle">VGW</text><text x="66" y="27" class="ct">Virtual private gateway</text><text x="66" y="45" class="cd">ASN 64512, attached to the VPC</text><text x="66" y="61" class="cd">BGP routes propagated to RTs</text></g>
+  <g transform="translate(345,426)"><rect width="290" height="74" rx="8" class="card" stroke="#ff9900" stroke-width="2"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#7b61ff"/><text x="34" y="41" class="ic" text-anchor="middle">VPN</text><text x="66" y="27" class="ct">Site-to-Site VPN</text><text x="278" y="27" class="cost" fill="#d13212" text-anchor="end">$0.05/hr</text><text x="66" y="45" class="cd">2 tunnels + customer gateway</text><text x="66" y="61" class="cd">169.254.21.0/30, .22.0/30</text></g>
+  <!-- row 3 -->
+  <g transform="translate(45,510)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#2e9e5b"/><text x="34" y="41" class="ic" text-anchor="middle">EKS</text><text x="66" y="27" class="ct">EKS cluster 1.35</text><text x="278" y="27" class="cost" fill="#d13212" text-anchor="end">$0.10/hr</text><text x="66" y="45" class="cd">VPC CNI, svc CIDR 172.20.0.0/16</text><text x="66" y="61" class="cd">no KMS, no CW logs (cost)</text></g>
+  <g transform="translate(345,510)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#2e9e5b"/><text x="34" y="41" class="ic" text-anchor="middle">EC2</text><text x="66" y="27" class="ct">Managed node group</text><text x="278" y="27" class="cost" fill="#d13212" text-anchor="end">$0.083/hr</text><text x="66" y="45" class="cd">2 × t3.medium, AL2023, 1 per AZ</text><text x="66" y="61" class="cd">pods get real VPC IPs</text></g>
+  <!-- row 4 -->
+  <g transform="translate(45,594)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#0f9d9a"/><text x="34" y="41" class="ic" text-anchor="middle">ALB</text><text x="66" y="27" class="ct">Application LB</text><text x="278" y="27" class="cost" fill="#d13212" text-anchor="end">~$0.023/hr</text><text x="66" y="45" class="cd">public, IP targets, HC /live</text><text x="66" y="61" class="cd">created by LB Controller (Helm)</text></g>
+  <g transform="translate(345,594)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#0f9d9a"/><text x="34" y="41" class="ic" text-anchor="middle">NLB</text><text x="66" y="27" class="ct">Network LB (internal)</text><text x="278" y="27" class="cost" fill="#d13212" text-anchor="end">~$0.023/hr</text><text x="66" y="45" class="cd">backend service, private subnets</text><text x="66" y="61" class="cd">IP targets → backend pods</text></g>
+  <!-- row 5 -->
+  <g transform="translate(45,678)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#0f9d9a"/><text x="34" y="41" class="ic" text-anchor="middle">R53</text><text x="66" y="27" class="ct">Route 53 private zone</text><text x="278" y="27" class="cost" fill="#545b64" text-anchor="end">$0.50/mo</text><text x="66" y="45" class="cd">backend.cloudbridge.internal</text><text x="66" y="61" class="cd">SOA neg. TTL 30 s (Test 1 fix)</text></g>
+  <g transform="translate(345,678)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#5a6b8c"/><text x="34" y="41" class="ic" text-anchor="middle">ECR</text><text x="66" y="27" class="ct">ECR repository</text><text x="278" y="27" class="cost" fill="#545b64" text-anchor="end">cents/mo</text><text x="66" y="45" class="cd">cloudbridge-app image, in-region</text><text x="66" y="61" class="cd">no cross-cloud pull dependency</text></g>
+  <!-- row 6 -->
+  <g transform="translate(45,762)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#5a6b8c"/><text x="34" y="41" class="ic" text-anchor="middle">IAM</text><text x="66" y="27" class="ct">IAM + Pod Identity</text><text x="278" y="27" class="cost" fill="#2e9e5b" text-anchor="end">free</text><text x="66" y="45" class="cd">LB Controller role, bound to</text><text x="66" y="61" class="cd">one service account only</text></g>
+  <g transform="translate(345,762)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#a0662b"/><text x="34" y="41" class="ic" text-anchor="middle">S3</text><text x="66" y="27" class="ct">S3 state bucket</text><text x="278" y="27" class="cost" fill="#545b64" text-anchor="end">cents/mo</text><text x="66" y="45" class="cd">Terraform state for every layer</text><text x="66" y="61" class="cd">versioned, encrypted, S3 locking</text></g>
+
+  <!-- ===================== VPN link ===================== -->
+  <line x1="635" y1="452" x2="765" y2="452" stroke="#16191f" stroke-width="2.5"/>
+  <line x1="635" y1="474" x2="765" y2="474" stroke="#16191f" stroke-width="2.5"/>
+  <circle cx="700" cy="452" r="4" fill="#ff9900"/><circle cx="700" cy="474" r="4" fill="#0078d4"/>
+  <rect x="655" y="500" width="90" height="98" rx="6" fill="#ffffff" stroke="#16191f" stroke-width="1"/>
+  <text x="700" y="518" class="lblb" text-anchor="middle">IPsec IKEv2</text>
+  <text x="700" y="534" class="lbl" text-anchor="middle">2 tunnels</text>
+  <text x="700" y="552" class="lblb" text-anchor="middle">eBGP</text>
+  <text x="700" y="568" class="lbl" text-anchor="middle">64512 ↔ 65515</text>
+  <text x="700" y="588" class="lblb" text-anchor="middle" fill="#2e9e5b">~12 ms RTT</text>
+
+  <!-- ===================== Azure panel ===================== -->
+  <rect x="750" y="200" width="620" height="660" rx="10" fill="#ffffff" fill-opacity="0.55" stroke="#0078d4" stroke-width="2"/>
+  <rect x="750" y="200" width="620" height="44" rx="10" fill="#0078d4"/>
+  <rect x="750" y="230" width="620" height="14" fill="#0078d4"/>
+  <text x="768" y="228" class="panel-h">Azure · northcentralus (Chicago)</text>
+  <text x="1352" y="228" class="panel-s" text-anchor="end">≈ $0.32/hr running</text>
+
+  <!-- row 0 -->
+  <g transform="translate(765,258)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#7b61ff"/><text x="34" y="41" class="ic" text-anchor="middle">RG</text><text x="66" y="27" class="ct">Resource group</text><text x="278" y="27" class="cost" fill="#2e9e5b" text-anchor="end">free</text><text x="66" y="45" class="cd">cloudbridge-rg</text><text x="66" y="61" class="cd">holds every Azure resource</text></g>
+  <g transform="translate(1065,258)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#7b61ff"/><text x="34" y="41" class="ic" text-anchor="middle">VNET</text><text x="66" y="27" class="ct">Virtual network</text><text x="278" y="27" class="cost" fill="#2e9e5b" text-anchor="end">free</text><text x="66" y="45" class="cd">10.20.0.0/16</text><text x="66" y="61" class="cd">no AZs in this region</text></g>
+  <!-- row 1 -->
+  <g transform="translate(765,342)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#7b61ff"/><text x="34" y="41" class="ic" text-anchor="middle">SUB</text><text x="66" y="27" class="ct">Subnets ×4</text><text x="278" y="27" class="cost" fill="#2e9e5b" text-anchor="end">free</text><text x="66" y="45" class="cd">aks-nodes /22, aks-pods /19</text><text x="66" y="61" class="cd">test /24, GatewaySubnet /27</text></g>
+  <g transform="translate(1065,342)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#7b61ff"/><text x="34" y="41" class="ic" text-anchor="middle">PIP</text><text x="66" y="27" class="ct">Public IPs ×3</text><text x="278" y="27" class="cost" fill="#d13212" text-anchor="end">$0.015/hr</text><text x="66" y="45" class="cd">VPN GW, AKS egress, frontend LB</text><text x="66" y="61" class="cd">= the subscription's limit of 3</text></g>
+  <!-- row 2 -->
+  <g transform="translate(765,426)"><rect width="290" height="74" rx="8" class="card" stroke="#0078d4" stroke-width="2"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#7b61ff"/><text x="34" y="41" class="ic" text-anchor="middle">VPNG</text><text x="66" y="27" class="ct">VPN gateway</text><text x="278" y="27" class="cost" fill="#d13212" text-anchor="end">$0.19/hr</text><text x="66" y="45" class="cd">VpnGw1AZ, ASN 65515, BGP on</text><text x="66" y="61" class="cd">APIPA .21.2 / .22.2 · 30–45 min build</text></g>
+  <g transform="translate(1065,426)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#7b61ff"/><text x="34" y="41" class="ic" text-anchor="middle">LNG</text><text x="66" y="27" class="ct">Local GWs + connections</text><text x="66" y="45" class="cd">1 per AWS tunnel endpoint</text><text x="66" y="61" class="cd">IKEv2, PSK, BGP, custom APIPA</text></g>
+  <!-- row 3 -->
+  <g transform="translate(765,510)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#2e9e5b"/><text x="34" y="41" class="ic" text-anchor="middle">AKS</text><text x="66" y="27" class="ct">AKS cluster 1.35</text><text x="278" y="27" class="cost" fill="#2e9e5b" text-anchor="end">$0 (Free tier)</text><text x="66" y="45" class="cd">Azure CNI, svc CIDR 172.21.0.0/16</text><text x="66" y="61" class="cd">no control-plane SLA</text></g>
+  <g transform="translate(1065,510)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#2e9e5b"/><text x="34" y="41" class="ic" text-anchor="middle">VMSS</text><text x="66" y="27" class="ct">System node pool</text><text x="278" y="27" class="cost" fill="#d13212" text-anchor="end">$0.075/hr</text><text x="66" y="45" class="cd">2 × B2als_v2 (2 vCPU / 4 GB)</text><text x="66" y="61" class="cd">pods in aks-pods: routable IPs</text></g>
+  <!-- row 4 -->
+  <g transform="translate(765,594)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#0f9d9a"/><text x="34" y="41" class="ic" text-anchor="middle">LB</text><text x="66" y="27" class="ct">Standard LB (public)</text><text x="278" y="27" class="cost" fill="#d13212" text-anchor="end">~$0.025/hr</text><text x="66" y="45" class="cd">public, static IP, probe /live</text><text x="66" y="61" class="cd">created by AKS from a Service</text></g>
+  <g transform="translate(1065,594)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#5a6b8c"/><text x="34" y="41" class="ic" text-anchor="middle">ACR</text><text x="66" y="27" class="ct">Container Registry</text><text x="278" y="27" class="cost" fill="#545b64" text-anchor="end">$0.17/day</text><text x="66" y="45" class="cd">Basic, admin user off</text><text x="66" y="61" class="cd">nodes pull with AcrPull identity</text></g>
+  <!-- row 5 -->
+  <g transform="translate(765,678)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#5a6b8c"/><text x="34" y="41" class="ic" text-anchor="middle">MI</text><text x="66" y="27" class="ct">Managed identity + RBAC</text><text x="278" y="27" class="cost" fill="#2e9e5b" text-anchor="end">free</text><text x="66" y="45" class="cd">Network Contributor (VNet, IP)</text><text x="66" y="61" class="cd">AcrPull (kubelet identity)</text></g>
+  <g transform="translate(1065,678)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#a0662b"/><text x="34" y="41" class="ic" text-anchor="middle">POL</text><text x="66" y="27" class="ct">Azure Policy</text><text x="278" y="27" class="cost" fill="#2e9e5b" text-anchor="end">free</text><text x="66" y="45" class="cd">student sub: 5 allowed regions</text><text x="66" y="61" class="cd">why we're not in eastus2</text></g>
+  <!-- row 6 -->
+  <g transform="translate(765,762)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#a0662b"/><text x="34" y="41" class="ic" text-anchor="middle">COST</text><text x="66" y="27" class="ct">Cost Management</text><text x="278" y="27" class="cost" fill="#2e9e5b" text-anchor="end">free</text><text x="66" y="45" class="cd">budget alerts $20 / $30 / $50</text><text x="66" y="61" class="cd">on the $100 student credit</text></g>
+  <g transform="translate(1065,762)"><rect width="290" height="74" rx="8" class="card"/><rect x="12" y="15" width="44" height="44" rx="6" fill="#5a6b8c"/><text x="34" y="41" class="ic" text-anchor="middle">ENTRA</text><text x="66" y="27" class="ct">Microsoft Entra ID</text><text x="278" y="27" class="cost" fill="#2e9e5b" text-anchor="end">free</text><text x="66" y="45" class="cd">university tenant, sign-in only</text><text x="66" y="61" class="cd">Owner on own subscription</text></g>
+
+  <!-- ===================== Footer ===================== -->
+  <rect x="30" y="880" width="430" height="128" rx="10" fill="#ffffff" stroke="#d5dbdb"/>
+  <text x="48" y="906" class="foot-h">Running cost (everything up)</text>
+  <text x="48" y="930" class="foot">AWS ≈ $0.33/hr · Azure ≈ $0.32/hr · total ≈ $0.65/hr</text>
+  <text x="48" y="950" class="foot">Biggest: Azure VPN GW, EKS control plane, node VMs, NAT</text>
+  <text x="48" y="970" class="foot">Budgets in both clouds alert at $20 / $30 / $50</text>
+  <text x="48" y="990" class="foot">Destroy order: dns → eks + aks → vpn → networks</text>
+
+  <rect x="485" y="880" width="430" height="128" rx="10" fill="#ffffff" stroke="#d5dbdb"/>
+  <text x="503" y="906" class="foot-h">Measured so far</text>
+  <text x="503" y="930" class="foot">VPN: 12 ms RTT; BGP loss on 1 tunnel cost &lt; 1 s</text>
+  <text x="503" y="950" class="foot">Region loss (± VPN): on Azure 77–107 s, back 77–93 s</text>
+  <text x="503" y="970" class="foot">Test 1 DNS outage: detected ≤ 60 s, clients on Azure 62–145 s</text>
+  <text x="503" y="990" class="foot">DNS failback 15 min → 70 s · node loss 89 → 57 s (tuned)</text>
+
+  <rect x="940" y="880" width="430" height="128" rx="10" fill="#ffffff" stroke="#d5dbdb"/>
+  <text x="958" y="906" class="foot-h">Legend</text>
+  <rect x="958" y="920" width="14" height="14" rx="3" fill="#7b61ff"/><text x="980" y="932" class="foot">Network</text>
+  <rect x="1060" y="920" width="14" height="14" rx="3" fill="#2e9e5b"/><text x="1082" y="932" class="foot">Compute / Kubernetes</text>
+  <rect x="1230" y="920" width="14" height="14" rx="3" fill="#0f9d9a"/><text x="1252" y="932" class="foot">Traffic / DNS</text>
+  <rect x="958" y="944" width="14" height="14" rx="3" fill="#5a6b8c"/><text x="980" y="956" class="foot">Registry / identity</text>
+  <rect x="1120" y="944" width="14" height="14" rx="3" fill="#a0662b"/><text x="1142" y="956" class="foot">State / governance / cost</text>
+  <text x="958" y="982" class="cost" fill="#d13212">$/hr</text><text x="995" y="982" class="foot">bills hourly · </text>
+  <text x="1080" y="982" class="cost" fill="#2e9e5b">free</text><text x="1112" y="982" class="foot">no charge</text>
+  <text x="958" y="1000" class="foot">Outlined cards are the two ends of the VPN.</text>
+</svg>

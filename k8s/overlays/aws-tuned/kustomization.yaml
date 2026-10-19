@@ -1,0 +1,38 @@
+# Same as overlays/aws, with failure-detection timers tightened for the node-failure test.
+# Compare against overlays/aws (defaults) — see docs/results.md for the trade-offs.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../aws
+patches:
+  - target: { kind: Deployment }
+    patch: |-
+      # Evict pods from a NotReady/unreachable node after 30 s instead of the default 300 s
+      - op: add
+        path: /spec/template/spec/tolerations
+        value:
+          - { key: node.kubernetes.io/not-ready, operator: Exists, effect: NoExecute, tolerationSeconds: 30 }
+          - { key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute, tolerationSeconds: 30 }
+      # Readiness: probe every 5 s, unready after 2 failures (default 10 s x 3)
+      - op: add
+        path: /spec/template/spec/containers/0/readinessProbe/periodSeconds
+        value: 5
+      - op: add
+        path: /spec/template/spec/containers/0/readinessProbe/failureThreshold
+        value: 2
+  # ALB: check targets every 5 s, unhealthy after 2 failures (default 15 s x 2),
+  # and drain deregistered targets for 30 s instead of 300 s
+  - target: { kind: Ingress, name: frontend }
+    patch: |-
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1healthcheck-interval-seconds
+        value: "5"
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1healthcheck-timeout-seconds
+        value: "3"
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1unhealthy-threshold-count
+        value: "2"
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1target-group-attributes
+        value: deregistration_delay.timeout_seconds=30

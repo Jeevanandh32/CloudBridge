@@ -1,0 +1,4 @@
+epoch_ms,node_ready,frontend_ready,backend_ready
+1792366467149,False,2,1
+1792366470917,False,1,1
+1792366474731,False,3,3

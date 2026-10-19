@@ -1,0 +1,4 @@
+bucket       = "cloudbridge-tfstate-<your-aws-account-id>"
+region       = "us-east-2"
+encrypt      = true
+use_lockfile = true

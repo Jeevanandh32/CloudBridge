@@ -1,0 +1,25 @@
+epoch_ms,phase,peers,t1_status,t2_status
+1792366971566,broken,169.254.22.1=Connecting 169.254.21.1=Connected ,Connected,Connected
+1792366989965,broken,169.254.22.1=Connecting 169.254.21.1=Connected ,Connected,Connected
+1792367008461,broken,169.254.22.1=Connecting 169.254.21.1=Connected ,Connected,Connected
+1792367026832,broken,169.254.22.1=Idle 169.254.21.1=Connected ,Connected,Connected
+1792367046123,broken,169.254.22.1=Connecting 169.254.21.1=Connected ,Connected,Connected
+1792367064495,broken,169.254.22.1=Connecting 169.254.21.1=Connected ,Connected,Connected
+1792367082912,broken,169.254.22.1=Connecting 169.254.21.1=Connected ,Connected,Connected
+1792367101443,broken,169.254.22.1=Connecting 169.254.21.1=Connected ,Connected,Connected
+1792367119790,broken,169.254.22.1=Connecting 169.254.21.1=Connected ,Connected,Connected
+1792367138170,broken,169.254.22.1=Connecting 169.254.21.1=Connected ,Connected,Connected
+1792367249122,restored,169.254.22.1=Connecting 169.254.21.1=Connected ,Connected,Connected
+1792367268020,restored,169.254.22.1=Connected 169.254.21.1=Connected ,Connected,Connected
+1792367286232,restored,169.254.22.1=Connected 169.254.21.1=Connected ,Connected,Connected
+1792367304222,restored,169.254.22.1=Connected 169.254.21.1=Connected ,Connected,Connected
+1792367322715,restored,169.254.22.1=Connected 169.254.21.1=Connected ,Connected,Connected
+1792367341227,restored,169.254.22.1=Connected 169.254.21.1=Connected ,Connected,Connected
+1792367359299,restored,169.254.22.1=Connected 169.254.21.1=Connected ,Connected,Connected
+1792367377692,restored,169.254.22.1=Connected 169.254.21.1=Connected ,Connected,Connected
+1792367395549,restored,169.254.22.1=Connected 169.254.21.1=Connected ,Connected,Connected
+1792367414379,restored,169.254.22.1=Connected 169.254.21.1=Connected ,Connected,Connected
+1792367432551,restored,169.254.22.1=Connected 169.254.21.1=Connected ,Connected,Connected
+1792367451154,restored,169.254.22.1=Connected 169.254.21.1=Connected ,Connected,Connected
+1792367469517,restored,169.254.22.1=Connected 169.254.21.1=Connected ,Connected,Connected
+1792367487529,restored,169.254.22.1=Connected 169.254.21.1=Connected ,Connected,Connected

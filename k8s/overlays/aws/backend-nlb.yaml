@@ -1,0 +1,13 @@
+# Internal NLB in front of the backend (private subnets only, reachable over the VPN too).
+# IP target mode: the NLB sends straight to pod IPs, skipping the NodePort hop.
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: cloudbridge
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+spec:
+  type: LoadBalancer

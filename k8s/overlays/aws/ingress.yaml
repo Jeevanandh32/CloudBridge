@@ -1,0 +1,28 @@
+# Public ALB for the frontend. IP target mode registers pod IPs directly.
+# Health check uses the shallow /live; the deep /health check is Route 53's job.
+# ALB timers here are the AWS defaults (baseline); the tuned overlay overrides them.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend
+  namespace: cloudbridge
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /live
+    # Written out even though 300 s is AWS's default: the controller never resets an attribute
+    # whose annotation was removed, so switching back from the tuned overlay left 30 s in place
+    alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=300
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
