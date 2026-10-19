@@ -2,6 +2,8 @@
 
 ![CloudBridge — multi-cloud failover on AWS and Azure](docs/cover.png)
 
+▶ **[Watch the 2-minute walkthrough](docs/cloudbridge-demo.mp4)** (with music), also on my [portfolio](https://jeevanandh32.github.io/#work).
+
 Multi-cloud AWS + Azure platform built with Terraform — then broken on purpose, measured, and
 explained from the routing and DNS layer up. Warm standby: EKS (AWS) primary, AKS (Azure) secondary,
 Route 53 health-checked failover, and a separate IPsec/eBGP VPN between the private networks.
