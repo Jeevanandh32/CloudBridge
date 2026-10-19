@@ -2,9 +2,9 @@
 
 ![CloudBridge — multi-cloud failover on AWS and Azure](docs/cover.png)
 
-▶ **[Watch the 2-minute walkthrough](docs/cloudbridge-demo.mp4)** (with music), also on my [portfolio](https://jeevanandh32.github.io/#work).
+▶ **[Watch the 2-minute walkthrough](docs/cloudbridge-demo.mp4)** (with music), also on my [portfolio](https://jeevanandh32.github.io/#cloudbridge).
 
-Multi-cloud AWS + Azure platform built with Terraform — then broken on purpose, measured, and
+Multi-cloud AWS + Azure platform built with Terraform — then tested with injected failures, measured, and
 explained from the routing and DNS layer up. Warm standby: EKS (AWS) primary, AKS (Azure) secondary,
 Route 53 health-checked failover, and a separate IPsec/eBGP VPN between the private networks.
 
@@ -24,7 +24,7 @@ Route 53 health-checked failover, and a separate IPsec/eBGP VPN between the priv
 
 ## Key findings
 
-| What I broke | What I measured | What I learned |
+| Failure injected | What I measured | What I learned |
 |---|---|---|
 | **The backend's DNS record** (repro of the Oct 2025 AWS outage) | Detected ≤ 60 s; clients on Azure 62–145 s; failback **> 3 min → ~70 s** after tuning | **DNS negative caching** (SOA minimum, RFC 2308) made recovery up to 15 min — 10× slower than the outage. Fixed with one SOA record. |
 | **The whole AWS app** | Clients on Azure 77–107 s, back in 77–93 s, **0 failed requests on failback** | Detection is fast; the tail is **resolver caching** of the ALB alias's fixed 60 s TTL. |
