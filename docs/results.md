@@ -5,7 +5,7 @@ Route 53 health checks: HTTP `/health` (deep), 10 s interval, 3 failures.
 Records: PRIMARY alias → AWS ALB (TTL 60 s, inherited), SECONDARY → Azure LB (TTL 30 s).
 Raw CSVs and break/restore timestamps: `docs/runs/`.
 
-## Test 1 — DNS outage (reproduction of Oct 2025)
+## Test 1 — DNS-dependency failure (inspired by the Oct 2025 outage)
 
 Break: delete `backend.cloudbridge.internal` (private zone, CNAME → internal NLB, TTL 30 s).
 All pods and load balancers stay healthy; only the dependency's name stops resolving.
@@ -55,7 +55,7 @@ same mechanism with a luckier cache.
 - The real lesson from Oct 2025: DNS-based failover is bounded by caches you don't control; keep the
   standby warm (it was — zero launches needed) and expect a ~1–2 min tail.
 
-## Test 2 — Region loss (whole AWS app gone)
+## Test 2 — Simulated AWS application loss
 
 Break: scale both EKS deployments (frontend, backend) to 0 replicas. The ALB stays up with **no
 targets**, so it answers 503 instantly. Restore: scale back to 3 + 3.
@@ -150,11 +150,18 @@ can't be steered from configuration — only by taking a path away.
 | Restore (ASN back to 64512) | BGP `Connected` at +113.8 s, **0 pings lost** |
 | `terraform plan` afterwards | No changes (restore was complete) |
 
-**Finding:** two tunnels + BGP made losing the active path nearly hitless (< 1 s). The slow part is
-*visibility*, not the reroute: Azure took ~1.5 min to show the BGP state (local-gateway update +
-BGP timers), and the AWS console reports this tunnel as `DOWN` even though IPsec was up.
+**Measurement boundary:** the 0.8 s value is the longest gap between received ping replies
+during the recorded failure window, at a nominal five probes per second. Nine probes were
+unanswered across that window. It does not measure elapsed time from the API request to
+BGP failure detection, and it does not establish a general sub-second tunnel-recovery guarantee.
+The first sampled changed BGP state appeared at +95.6 s; that observation includes the
+local-gateway update, protocol timers, and polling. IPsec remained connected in the sampled
+Azure status while AWS reported the BGP-dependent tunnel status as down.
 
 ### B2 — MTU and MSS across IPsec
+
+This experiment measures path MTU and observes the managed gateways' MSS rewriting.
+No manual MSS adjustment was configured as part of this test.
 
 | Measure | AWS → Azure | Azure → AWS |
 |---|---|---|
@@ -254,14 +261,18 @@ private subnets are /19.
 
 ### C1 — Path selection across the two tunnels
 Recorded with B1 above: both directions used **tunnel 2**; tunnel 1 carried only BGP keepalives.
-Managed gateways expose no AS-path/MED controls, so the only lever is removing a path (B1), which
-moved traffic to tunnel 1 in < 1 s.
+The experiment removed the active BGP path. During that test, the longest received-ping
+gap was 0.8 s, with nine unanswered probes across the failure window. This does not establish
+a tunnel-rebuild or BGP-detection latency.
 
-### C2 — Full AWS region loss: app **and** VPN down
+### C2 — Simulated AWS application and VPN loss
 
 Break: EKS app scaled to 0 **and** a wrong pre-shared key on both Azure connections (IKE fails →
 both tunnels down). Fix: `terraform apply` in `connectivity/vpn` — the runbook's drift step
 (plan showed `shared_key` changes on both connections, values hidden as sensitive).
+
+This injects application and VPN failures while the providers' other services remain
+available. It is a regional-loss simulation, not an actual provider-wide regional outage.
 
 | Time after break | AWS tunnels | Azure BGP | Azure routes to AWS | AWS route to Azure | Alarms (degraded / down) |
 |---|---|---|---|---|---|

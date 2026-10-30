@@ -26,15 +26,24 @@ Route 53 health-checked failover, and a separate IPsec/eBGP VPN between the priv
 
 | Failure injected | What I measured | What I learned |
 |---|---|---|
-| **The backend's DNS record** (repro of the Oct 2025 AWS outage) | Detected ≤ 60 s; clients on Azure 62–145 s; failback **> 3 min → ~70 s** after tuning | **DNS negative caching** (SOA minimum, RFC 2308) made recovery up to 15 min — 10× slower than the outage. Fixed with one SOA record. |
+| **The backend's DNS record** (inspired by the Oct 2025 AWS outage) | Sampled health-status upper bounds 32–69 s; clients on Azure 62–145 s; tuned failback **68–78 s** | DNS negative caching delayed recovery. Lowering the private-zone SOA TTL/minimum from the initial settings improved the recorded failback times. |
 | **The whole AWS app** | Clients on Azure 77–107 s, back in 77–93 s, **0 failed requests on failback** | Detection is fast; the tail is **resolver caching** of the ALB alias's fixed 60 s TTL. |
-| **The whole AWS region incl. both VPN tunnels** | Failover unchanged (+102 s); BGP withdrew routes in both clouds; alarms fired and cleared | Failover never depends on the VPN — **separate failure domains**. |
+| **Simulated AWS app + VPN loss** (app scaled to zero; both tunnel PSKs invalidated) | Client reached Azure at +102 s; BGP withdrew routes in both clouds; alarms fired and cleared | Public application failover and the private VPN were exercised as separate failure paths. |
 | **An EKS worker node** | User-facing errors **89 s → 57 s (−36%)** with tuned ALB/K8s timers | Kubernetes recovered in 9–30 s; **the load balancer was the bottleneck**. |
-| **BGP on the active tunnel** (IPsec up) | **< 1 s** of loss (traffic moved to the other tunnel) | AWS shows the tunnel DOWN when only BGP is down; Azure shows it Connected. |
+| **BGP on the active tunnel** (IPsec up) | **0.8 s longest ping-reply gap; 9 unanswered probes** at 5 probes/s | The test observed a short traffic interruption during path change. This is not a measurement of BGP detection or tunnel-rebuild time. |
 | **MTU / route propagation / NACL / ALB / pod IPs** | Path MTU 1422, MSS clamped 1310/1360 · green dashboard + blackholed traffic · one-way NACL failure · 502/503/504 decoded · 17 pods per t3.medium | Break/fix lab: each fault hides behind a healthy-looking layer. |
 
 Every run, number, and raw CSV: [`docs/results.md`](docs/results.md) and [`docs/runs/`](docs/runs/).
 Alarms and recovery procedures: [`docs/runbook.md`](docs/runbook.md).
+
+### Measurement boundaries
+
+- These are controlled lab measurements. HTTP failover is timed from fault injection to the first successful response from the standby, using approximately one request per second.
+- The **77–107 s** application-failover range comes from three app-loss runs. DNS-dependency failures took **62–145 s**; the results do not establish a universal under-two-minute recovery guarantee.
+- The BGP experiment reports the largest observed ping-reply gap, not elapsed time from the configuration request to BGP failure detection. Nine probes were unanswered across that run.
+- MTU tests measured **1422 bytes AWS → Azure** and **1420 bytes Azure → AWS**. Packet captures observed gateway MSS clamping to **1310/1360**; this project did not configure a manual MSS adjustment.
+- The regional-loss scenarios disable the application and, in Test 5, its private VPN. They do not reproduce every failure mode of an actual cloud-provider regional outage.
+- The node-failure comparison uses one completed default run and two tuned runs: the mean last-error time fell from **88.7 s to 56.8 s**. The **36%** figure refers to this recovery-time measure; failed-request counts fell from 26 to 18 (**31%**).
 
 ## Design decisions
 
@@ -44,7 +53,7 @@ Alarms and recovery procedures: [`docs/runbook.md`](docs/runbook.md).
 | **Deep `/health` for Route 53 and readiness; shallow `/live` for liveness and LB checks** | A broken dependency should move traffic, not restart healthy frontends. |
 | **Route 53 data plane only** for failover | Health checks and DNS answers are global; record edits (control plane) live in us-east-1. |
 | **One image registry per cloud** (ECR, ACR) | No cross-cloud pull dependency during an incident. |
-| **BGP over two tunnels** instead of static routes | Automatic withdrawal and reroute — measured < 1 s when one tunnel's BGP failed. |
+| **BGP over two tunnels** instead of static routes | Route withdrawal and an alternate path; the recorded active-peer failure test had a 0.8 s maximum ping-reply gap. |
 | **AWS in us-east-2**, not us-east-1 | Avoid the region (and hidden dependencies) that failed in Oct 2025. |
 | **Azure in northcentralus**, VpnGw1AZ | The Azure for Students policy allows only 5 regions; non-AZ VPN SKUs can no longer be created, AZ SKUs run regional in a no-zone region. |
 | **Smallest viable sizes**, single NAT, Free AKS tier | Cost: ≈ $0.65/hr with everything up; budgets alert at $20 / $30 / $50 in both clouds. |
@@ -150,7 +159,7 @@ az network vnet-gateway list-bgp-peer-status -g cloudbridge-rg -n cloudbridge-vp
 | Test | Command | What it breaks |
 |---|---|---|
 | 1. DNS outage | `tests/test1-dns-outage.sh <run>` | Deletes `backend.cloudbridge.internal` |
-| 2. Region loss | `tests/test2-region-loss.sh <run>` | Scales the AWS app to 0 |
+| 2. Simulated app loss | `tests/test2-region-loss.sh <run>` | Scales the AWS app to 0 |
 | 3. Node failure | `tests/test3-node-failure.sh default-1` (then `k8s/deploy.sh aws-tuned`, `... tuned-1`) | Terminates an EKS worker |
 | 4. B1 BGP down | `tests/test4-b1-bgp-down.sh` | Wrong peer ASN on the active tunnel |
 | 4. B2 MTU/MSS | `tests/test4-b2-mtu.sh` | Measurement only |
@@ -158,7 +167,7 @@ az network vnet-gateway list-bgp-peer-status -g cloudbridge-rg -n cloudbridge-vp
 | 4. B4 NACL | `tests/test4-b4-nacl.sh` | Denies ephemeral ports from Azure |
 | 4. B5 ALB errors | `tests/test4-b5-lb-errors.sh` | Fault endpoints + 5 s idle timeout |
 | 4. B6 Pod IPs | `tests/test4-b6-pod-ips.sh` | Scales the backend to 30 |
-| 5. C2 Region + VPN | `tests/test5-c2-region-vpn.sh break`, then `terraform apply` in `connectivity/vpn`, then `... restore` | App to 0 + wrong PSKs |
+| 5. C2 Simulated app + VPN loss | `tests/test5-c2-region-vpn.sh break`, then `terraform apply` in `connectivity/vpn`, then `... restore` | App to 0 + wrong PSKs |
 
 Every script restores what it broke on exit (C2's restore is the Terraform drift fix, by design).
 
