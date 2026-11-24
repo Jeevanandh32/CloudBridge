@@ -1,0 +1,64 @@
+== Before
+-- TGW route table 'inspection' (tgw-rtb-0889254e2a32678d5)
+------------------------------------------------------------
+|                SearchTransitGatewayRoutes                |
++-----------------+--------+---------+-------------+-------+
+|      cidr       | paths  |  state  |    type     |  via  |
++-----------------+--------+---------+-------------+-------+
+|  10.10.0.0/20   |  1     |  active |  propagated |  vpc  |
+|  10.20.0.0/20   |  4     |  active |  propagated |  vpn  |
+|  10.20.240.0/22 |  4     |  active |  propagated |  vpn  |
++-----------------+--------+---------+-------------+-------+
+== nftables counters before the curls
+-- cloudbridge-fw-a
+		type filter hook forward priority filter; policy drop;
+		ct state invalid counter packets 0 bytes 0 log prefix "fw-invalid " level info drop
+		ip saddr 10.0.0.0/8 ct state new counter packets 591 bytes 115254 accept
+		counter packets 0 bytes 0 log prefix "fw-drop " level info drop
+
+-- cloudbridge-fw-b
+		type filter hook forward priority filter; policy drop;
+		ct state invalid counter packets 0 bytes 0 log prefix "fw-invalid " level info drop
+		ip saddr 10.0.0.0/8 ct state new counter packets 504 bytes 34008 accept
+		counter packets 0 bytes 0 log prefix "fw-drop " level info drop
+
+
+== Evidence 1: the inspection table has no route back to the spoke
+-- TGW route table 'inspection' (tgw-rtb-0889254e2a32678d5)
+------------------------------------------------------------
+|                SearchTransitGatewayRoutes                |
++-----------------+--------+---------+-------------+-------+
+|      cidr       | paths  |  state  |    type     |  via  |
++-----------------+--------+---------+-------------+-------+
+|  10.20.0.0/20   |  4     |  active |  propagated |  vpn  |
+|  10.20.240.0/22 |  4     |  active |  propagated |  vpn  |
++-----------------+--------+---------+-------------+-------+
+   inspection table, exact match 10.10.0.0/20: 0 active route(s)  <- 0 = the mistake
+
+== Evidence 2: the vpn table still sends 10.10.0.0/20 to the inspection VPC (and BGP still advertises it to Azure)
+-- TGW route table 'vpn' (tgw-rtb-0c28d5c0ce37c47ca)
+------------------------------------------------------------
+|                SearchTransitGatewayRoutes                |
++-----------------+--------+---------+-------------+-------+
+|      cidr       | paths  |  state  |    type     |  via  |
++-----------------+--------+---------+-------------+-------+
+|  10.10.0.0/20   |  1     |  active |  static     |  vpc  |
+|  10.10.240.0/24 |  1     |  active |  propagated |  vpc  |
++-----------------+--------+---------+-------------+-------+
+
+== Evidence 3: nftables counters after the curls
+   The 'ip saddr 10.0.0.0/8 ct state new' accept counter grew: the firewalls forwarded
+   the SYNs, then the TGW dropped them (no route in the inspection table). Nothing hit
+   fw-invalid or fw-drop: the firewall is not the problem.
+-- cloudbridge-fw-a
+		type filter hook forward priority filter; policy drop;
+		ct state invalid counter packets 36 bytes 2160 log prefix "fw-invalid " level info drop
+		ip saddr 10.0.0.0/8 ct state new counter packets 782 bytes 126746 accept
+		counter packets 0 bytes 0 log prefix "fw-drop " level info drop
+
+-- cloudbridge-fw-b
+		type filter hook forward priority filter; policy drop;
+		ct state invalid counter packets 7 bytes 420 log prefix "fw-invalid " level info drop
+		ip saddr 10.0.0.0/8 ct state new counter packets 722 bytes 47096 accept
+		counter packets 0 bytes 0 log prefix "fw-drop " level info drop
+

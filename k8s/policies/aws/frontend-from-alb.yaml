@@ -1,0 +1,18 @@
+# EKS: the ALB (IP target mode) connects to the frontend pods from its own ENIs in the public
+# subnets 10.10.4.0/24 and 10.10.5.0/24; that covers user traffic and the ALB health checks.
+# Pod IPs are VPC IPs on EKS, so the rule is limited to the ALB subnets: a wider ipBlock would
+# also let in-cluster pods (which live in the node or pod subnets) through.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-ingress-from-lb
+  namespace: cloudbridge
+spec:
+  podSelector:
+    matchLabels: { app: frontend }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock: { cidr: 10.10.4.0/23 }
+      ports:
+        - { protocol: TCP, port: 8080 }

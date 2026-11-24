@@ -1,0 +1,297 @@
+{
+ "saved_at": "2026-11-23T22:49:45Z",
+ "report": "../mindbridge/whatif-report.json",
+ "report_mtime": "2026-11-23T21:39:53Z",
+ "method": "N-1: remove each component, evaluate every flow. severity = flow weight x impact x recovery penalty",
+ "components": {
+  "dns-route53": {
+   "component": "dns-route53",
+   "name": "Route 53 public zone name servers",
+   "cloud": "aws",
+   "layer": "planned",
+   "planned_layer": "global/dns",
+   "status": "planned",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 10.49,
+   "band": "low",
+   "worst_status": "degraded",
+   "recovery": "auto",
+   "recovery_s": 3.0,
+   "redundancy_s": null,
+   "summary": "users recover in ~3 s; redundancy is reduced until the component is fixed",
+   "failure_mode": null,
+   "failure_modes": {},
+   "flows": [
+    {
+     "flow": "users-app",
+     "weight": 10,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 3.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "dns-authoritative",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 3.0,
+       "lost": [
+        "dns-route53"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 5.25,
+     "flow_name": "Users -> app.jeevs.click (AWS active, Azure failover via DNS health checks)"
+    },
+    {
+     "flow": "aws-ingress",
+     "weight": 5,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 3.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "dns-authoritative",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 3.0,
+       "lost": [
+        "dns-route53"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 2.62,
+     "flow_name": "Users -> ALB -> EKS (active path)"
+    },
+    {
+     "flow": "azure-ingress",
+     "weight": 5,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 3.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "dns-authoritative",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 3.0,
+       "lost": [
+        "dns-route53"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 2.62,
+     "flow_name": "Users / health checks -> Azure firewall DNAT -> AKS ILB (failover path)"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "dns-provider",
+   "fixes": [
+    {
+     "mitigation": "Already two providers listed at the registrar; resolvers retry the other one",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 36
+  },
+  "dns-azure": {
+   "component": "dns-azure",
+   "name": "Azure DNS public zone name servers",
+   "cloud": "azure",
+   "layer": "planned",
+   "planned_layer": "global/dns",
+   "status": "planned",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 10.49,
+   "band": "low",
+   "worst_status": "degraded",
+   "recovery": "auto",
+   "recovery_s": 3.0,
+   "redundancy_s": null,
+   "summary": "users recover in ~3 s; redundancy is reduced until the component is fixed",
+   "failure_mode": null,
+   "failure_modes": {},
+   "flows": [
+    {
+     "flow": "users-app",
+     "weight": 10,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 3.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "dns-authoritative",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 3.0,
+       "lost": [
+        "dns-azure"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 5.25,
+     "flow_name": "Users -> app.jeevs.click (AWS active, Azure failover via DNS health checks)"
+    },
+    {
+     "flow": "aws-ingress",
+     "weight": 5,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 3.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "dns-authoritative",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 3.0,
+       "lost": [
+        "dns-azure"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 2.62,
+     "flow_name": "Users -> ALB -> EKS (active path)"
+    },
+    {
+     "flow": "azure-ingress",
+     "weight": 5,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 3.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "dns-authoritative",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 3.0,
+       "lost": [
+        "dns-azure"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 2.62,
+     "flow_name": "Users / health checks -> Azure firewall DNAT -> AKS ILB (failover path)"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "dns-provider",
+   "fixes": [
+    {
+     "mitigation": "Already two providers listed at the registrar; resolvers retry the other one",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 35
+  },
+  "registrar": {
+   "component": "registrar",
+   "name": "Domain registrar for jeevs.click (name server delegation)",
+   "cloud": "external",
+   "layer": "planned",
+   "planned_layer": "global/dns",
+   "status": "planned",
+   "kind": "external",
+   "section": "management",
+   "severity": 12.0,
+   "band": "low",
+   "worst_status": "broken",
+   "recovery": "provider",
+   "recovery_s": null,
+   "redundancy_s": null,
+   "summary": "users stay affected until the provider restores it",
+   "failure_mode": null,
+   "failure_modes": {},
+   "flows": [
+    {
+     "flow": "domain-control",
+     "weight": 3,
+     "status": "broken",
+     "impact_pct": 100.0,
+     "recovery": "provider",
+     "recovery_s": null,
+     "redundancy_lost_pct": 0.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "registrar",
+       "impact_pct": 100.0,
+       "recovery": "provider",
+       "recovery_s": null,
+       "lost": [
+        "registrar"
+       ]
+      }
+     ],
+     "severity": 12.0,
+     "flow_name": "Management: name server delegation and domain renewal"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "registrar",
+   "fixes": [
+    {
+     "mitigation": "Registrar transfer lock on, and a calendar reminder well before expiry (auto-renew stays off)",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 34
+  }
+ }
+}

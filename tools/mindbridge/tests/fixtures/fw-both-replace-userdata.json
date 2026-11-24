@@ -1,0 +1,176 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.10.5",
+  "resource_changes": [
+    {
+      "address": "aws_instance.fw[0]",
+      "mode": "managed",
+      "type": "aws_instance",
+      "name": "fw",
+      "index": 0,
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "delete",
+          "create"
+        ],
+        "before": {
+          "id": "i-0fwa",
+          "instance_type": "t4g.nano",
+          "private_ip": "10.10.240.40",
+          "source_dest_check": false,
+          "associate_public_ip_address": true,
+          "primary_network_interface_id": "eni-0fwa",
+          "subnet_id": "subnet-0fwa",
+          "user_data_replace_on_change": true,
+          "tags": {
+            "Name": "cloudbridge-fw-a"
+          },
+          "user_data": "0f1e2d3c4b5a69788796a5b4c3d2e1f0aabbccdd"
+        },
+        "after": {
+          "id": null,
+          "instance_type": "t4g.nano",
+          "private_ip": "10.10.240.40",
+          "source_dest_check": false,
+          "associate_public_ip_address": true,
+          "primary_network_interface_id": null,
+          "subnet_id": "subnet-0fwa",
+          "user_data_replace_on_change": true,
+          "tags": {
+            "Name": "cloudbridge-fw-a"
+          },
+          "user_data": "99887766554433221100ffeeddccbbaa00112233"
+        },
+        "after_unknown": {
+          "id": true,
+          "primary_network_interface_id": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {},
+        "replace_paths": [
+          [
+            "user_data"
+          ]
+        ]
+      },
+      "action_reason": "replace_because_cannot_update"
+    },
+    {
+      "address": "aws_route.tgw_to_fw[0]",
+      "mode": "managed",
+      "type": "aws_route",
+      "name": "tgw_to_fw",
+      "index": 0,
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "id": "r-rtb-0tgwa1080289494",
+          "route_table_id": "rtb-0tgwa",
+          "destination_cidr_block": "0.0.0.0/0",
+          "network_interface_id": "eni-0fwa"
+        },
+        "after": {
+          "id": "r-rtb-0tgwa1080289494",
+          "route_table_id": "rtb-0tgwa",
+          "destination_cidr_block": "0.0.0.0/0",
+          "network_interface_id": null
+        },
+        "after_unknown": {
+          "network_interface_id": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {}
+      }
+    },
+    {
+      "address": "aws_instance.fw[1]",
+      "mode": "managed",
+      "type": "aws_instance",
+      "name": "fw",
+      "index": 1,
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "delete",
+          "create"
+        ],
+        "before": {
+          "id": "i-0fwb",
+          "instance_type": "t4g.nano",
+          "private_ip": "10.10.240.56",
+          "source_dest_check": false,
+          "associate_public_ip_address": true,
+          "primary_network_interface_id": "eni-0fwb",
+          "subnet_id": "subnet-0fwb",
+          "user_data_replace_on_change": true,
+          "tags": {
+            "Name": "cloudbridge-fw-b"
+          },
+          "user_data": "0f1e2d3c4b5a69788796a5b4c3d2e1f0aabbccdd"
+        },
+        "after": {
+          "id": null,
+          "instance_type": "t4g.nano",
+          "private_ip": "10.10.240.56",
+          "source_dest_check": false,
+          "associate_public_ip_address": true,
+          "primary_network_interface_id": null,
+          "subnet_id": "subnet-0fwb",
+          "user_data_replace_on_change": true,
+          "tags": {
+            "Name": "cloudbridge-fw-b"
+          },
+          "user_data": "99887766554433221100ffeeddccbbaa00112233"
+        },
+        "after_unknown": {
+          "id": true,
+          "primary_network_interface_id": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {},
+        "replace_paths": [
+          [
+            "user_data"
+          ]
+        ]
+      },
+      "action_reason": "replace_because_cannot_update"
+    },
+    {
+      "address": "aws_route.tgw_to_fw[1]",
+      "mode": "managed",
+      "type": "aws_route",
+      "name": "tgw_to_fw",
+      "index": 1,
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "id": "r-rtb-0tgwb1080289494",
+          "route_table_id": "rtb-0tgwb",
+          "destination_cidr_block": "0.0.0.0/0",
+          "network_interface_id": "eni-0fwb"
+        },
+        "after": {
+          "id": "r-rtb-0tgwb1080289494",
+          "route_table_id": "rtb-0tgwb",
+          "destination_cidr_block": "0.0.0.0/0",
+          "network_interface_id": null
+        },
+        "after_unknown": {
+          "network_interface_id": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {}
+      }
+    }
+  ],
+  "configuration": {},
+  "planned_values": {}
+}

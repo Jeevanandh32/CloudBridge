@@ -1,0 +1,13 @@
+-- 10.10.0.10 Azure->AWS
+[SUM]   0.00-15.00  sec  29.0 MBytes  16.2 Mbits/sec    0             sender
+[SUM]   0.00-15.01  sec  29.0 MBytes  16.2 Mbits/sec                  receiver
+-- 10.10.0.10 AWS->Azure
+[SUM]   0.00-15.01  sec  29.0 MBytes  16.2 Mbits/sec    0             sender
+[SUM]   0.00-15.00  sec  29.0 MBytes  16.2 Mbits/sec                  receiver
+-- 10.10.0.74 Azure->AWS
+[SUM]   0.00-15.00  sec  29.0 MBytes  16.2 Mbits/sec    0             sender
+[SUM]   0.00-15.01  sec  29.0 MBytes  16.2 Mbits/sec                  receiver
+-- 10.10.0.74 AWS->Azure
+[SUM]   0.00-15.01  sec  29.0 MBytes  16.2 Mbits/sec    0             sender
+[SUM]   0.00-15.00  sec  29.0 MBytes  16.2 Mbits/sec                  receiver
+

@@ -1,0 +1,148 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.10.5",
+  "resource_changes": [
+    {
+      "address": "aws_vpn_connection.azure[\"c0\"]",
+      "mode": "managed",
+      "type": "aws_vpn_connection",
+      "name": "azure",
+      "index": "c0",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "delete",
+          "create"
+        ],
+        "before": {
+          "id": "vpn-0c0",
+          "customer_gateway_id": "cgw-0c0",
+          "transit_gateway_id": "tgw-0hub",
+          "type": "ipsec.1",
+          "static_routes_only": false,
+          "tunnel1_inside_cidr": "169.254.21.0/30",
+          "tunnel2_inside_cidr": "169.254.22.0/30",
+          "tunnel1_address": "198.51.100.10",
+          "tunnel2_address": "198.51.100.11",
+          "transit_gateway_attachment_id": "tgw-attach-0vpnc0"
+        },
+        "after": {
+          "id": null,
+          "customer_gateway_id": "cgw-0c0",
+          "transit_gateway_id": "tgw-0hub",
+          "type": "ipsec.1",
+          "static_routes_only": false,
+          "tunnel1_inside_cidr": "169.254.21.8/30",
+          "tunnel2_inside_cidr": "169.254.22.0/30",
+          "tunnel1_address": null,
+          "tunnel2_address": null,
+          "transit_gateway_attachment_id": null
+        },
+        "after_unknown": {
+          "id": true,
+          "tunnel1_address": true,
+          "tunnel2_address": true,
+          "transit_gateway_attachment_id": true,
+          "tunnel1_preshared_key": true,
+          "tunnel2_preshared_key": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {},
+        "replace_paths": [
+          [
+            "tunnel1_inside_cidr"
+          ]
+        ]
+      },
+      "action_reason": "replace_because_cannot_update"
+    },
+    {
+      "address": "aws_ec2_transit_gateway_route_table_association.vpn[\"c0\"]",
+      "mode": "managed",
+      "type": "aws_ec2_transit_gateway_route_table_association",
+      "name": "vpn",
+      "index": "c0",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "delete",
+          "create"
+        ],
+        "before": {
+          "id": "tgw-rtb-0vpn_tgw-attach-0vpnc0",
+          "transit_gateway_attachment_id": "tgw-attach-0vpnc0"
+        },
+        "after": {
+          "id": null,
+          "transit_gateway_attachment_id": null
+        },
+        "after_unknown": {
+          "id": true,
+          "transit_gateway_attachment_id": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {},
+        "replace_paths": [
+          [
+            "transit_gateway_attachment_id"
+          ]
+        ]
+      },
+      "action_reason": "replace_because_cannot_update"
+    },
+    {
+      "address": "azurerm_local_network_gateway.aws[\"c0-t1\"]",
+      "mode": "managed",
+      "type": "azurerm_local_network_gateway",
+      "name": "aws",
+      "index": "c0-t1",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/cloudbridge-rg/providers/Microsoft.Network/localNetworkGateways/cloudbridge-lng-aws-c0-t1",
+          "gateway_address": "198.51.100.10"
+        },
+        "after": {
+          "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/cloudbridge-rg/providers/Microsoft.Network/localNetworkGateways/cloudbridge-lng-aws-c0-t1",
+          "gateway_address": null
+        },
+        "after_unknown": {
+          "gateway_address": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {}
+      }
+    },
+    {
+      "address": "azurerm_local_network_gateway.aws[\"c0-t2\"]",
+      "mode": "managed",
+      "type": "azurerm_local_network_gateway",
+      "name": "aws",
+      "index": "c0-t2",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/cloudbridge-rg/providers/Microsoft.Network/localNetworkGateways/cloudbridge-lng-aws-c0-t2",
+          "gateway_address": "198.51.100.10"
+        },
+        "after": {
+          "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/cloudbridge-rg/providers/Microsoft.Network/localNetworkGateways/cloudbridge-lng-aws-c0-t2",
+          "gateway_address": null
+        },
+        "after_unknown": {
+          "gateway_address": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {}
+      }
+    }
+  ],
+  "configuration": {},
+  "planned_values": {}
+}

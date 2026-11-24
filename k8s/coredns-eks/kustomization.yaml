@@ -1,0 +1,7 @@
+# kubectl --context cloudbridge-eks diff -k k8s/coredns-eks     (see what changes)
+# kubectl --context cloudbridge-eks apply -k k8s/coredns-eks
+# k8s/deploy.sh coredns does both.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - coredns-configmap.yaml

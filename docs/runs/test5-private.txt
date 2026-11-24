@@ -1,0 +1,32 @@
+== Test 5 private DNS and private access, 2026-11-23T21:22:30Z
+
+== DNS, AKS pod -> AWS private zone (CoreDNS -> node resolver = Azure fw dnsmasq -> AWS fw -> VPC resolver)
+10.10.240.40
+  -> exit 0
+   expect 10.10.240.40
+== DNS, EKS pod -> Azure private zone (CoreDNS stanza k8s/coredns-eks -> AWS fw -> Azure fw -> 168.63.129.16)
+10.20.241.4
+  -> exit 0
+   expect 10.20.241.4
+
+== EKS pod reads the Azure blob through the Private Endpoint
+cbhub5m1003ge.privatelink.blob.core.windows.net.
+10.20.5.4
+  -> exit 0
+   expect a CNAME to cbhub5m1003ge.privatelink.blob.core.windows.net and an A record in 10.20.5.0/27
+hello from Azure Blob over Private Endpoint
+   remote_ip=10.20.5.4 http=200
+  -> exit 0
+   expect the blob text, remote_ip 10.20.5.x (path: EKS -> TGW -> AWS fw -> VPN -> Azure fw (SNAT) -> PE)
+
+== AKS pod reads S3 through the interface endpoint (over the VPN)
+10.10.0.56
+  -> exit 0
+   expect private IPs in 10.10.0.0/26 (the endpoint ENI in 2a)
+   remote_ip=10.10.0.56 http=000
+command terminated with exit code 60
+  -> exit 60
+   expect 'hello from AWS S3 over PrivateLink', http 200
+-- the same object through the public S3 endpoint (expect 403: the bucket policy requires the endpoint)
+   remote_ip=3.5.90.22 http=403
+  -> exit 0

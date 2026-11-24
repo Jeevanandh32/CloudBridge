@@ -1,0 +1,17 @@
+flow 1 replies=2641 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 2 replies=2641 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 3 replies=2641 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 4 replies=2640 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 5 replies=2641 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 6 replies=2641 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 7 replies=2641 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 8 replies=2640 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 9 replies=2641 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 10 replies=2641 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 11 replies=2640 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 12 replies=2641 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 13 replies=2641 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 14 replies=2641 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 15 replies=2640 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 16 replies=2641 missed=0 max_gap_s=0.000 gap_start=0.000
+BGP down on c0-t1 (IPsec up): 0 of 16 flows had a gap (0%); longest gap 0.00 s; mean gap of affected flows 0.00 s

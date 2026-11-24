@@ -1,0 +1,10 @@
+break=1795475045712
+break_done=1795475098415
+replicas_frontend=3
+replicas_backend=3
+fw_public_ip=20.221.222.24
+resolver=1.1.1.1
+r53_ns=ns-1232.awsdns-26.org
+tm_fqdn=cloudbridge-app-65e29c.trafficmanager.net
+psk_fixed=1795475943292
+restore=1795475943311

@@ -1,0 +1,2365 @@
+{
+ "saved_at": "2026-11-23T23:03:35Z",
+ "report": "../mindbridge/whatif-report.json",
+ "report_mtime": "2026-11-23T21:39:53Z",
+ "method": "N-1: remove each component, evaluate every flow. severity = flow weight x impact x recovery penalty",
+ "note": "The what-if sweep is N-1 (one component at a time). Test 2 removes the app and all 4 tunnels together, so compare each row with its part of the result, not with the combined outage.",
+ "components": {
+  "aws-vpn-c0": {
+   "component": "aws-vpn-c0",
+   "name": "AWS VPN connection c0 (to Azure instance0)",
+   "cloud": "aws",
+   "layer": "connectivity/vpn",
+   "planned_layer": null,
+   "status": "built",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 14.25,
+   "band": "low",
+   "worst_status": "degraded",
+   "recovery": "auto",
+   "recovery_s": 30.0,
+   "redundancy_s": null,
+   "summary": "users recover in ~30 s; redundancy is reduced until the component is fixed",
+   "failure_mode": "silent",
+   "failure_modes": {
+    "clean": {
+     "name": "clean withdrawal",
+     "cause": "connection replaced or deleted through the API (Terraform): the BGP sessions are torn down",
+     "severity": 0.0,
+     "worst_status": "ok",
+     "recovery": "none",
+     "recovery_s": 0.0,
+     "redundancy_s": null,
+     "summary": "no flow loses packets; redundancy is reduced until the component is fixed",
+     "flows": [
+      {
+       "flow": "aws-to-azure-blob",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "azure-to-aws",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "azure-to-s3",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "dns-aws-to-azure",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "dns-azure-to-aws",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      }
+     ]
+    },
+    "silent": {
+     "name": "silent failure",
+     "cause": "the AWS tunnel endpoints fail without a NOTIFICATION",
+     "severity": 14.25,
+     "worst_status": "degraded",
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_s": null,
+     "summary": "users recover in ~30 s; redundancy is reduced until the component is fixed",
+     "flows": [
+      {
+       "flow": "azure-to-aws",
+       "status": "degraded",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 5.25
+      },
+      {
+       "flow": "dns-aws-to-azure",
+       "status": "degraded",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 3.0
+      },
+      {
+       "flow": "dns-azure-to-aws",
+       "status": "degraded",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 3.0
+      },
+      {
+       "flow": "aws-to-azure-blob",
+       "status": "degraded",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 1.5
+      },
+      {
+       "flow": "azure-to-s3",
+       "status": "degraded",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 1.5
+      }
+     ]
+    }
+   },
+   "flows": [
+    {
+     "flow": "azure-to-aws",
+     "weight": 7,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "aws-vpn-c0"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "2 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 5.25,
+     "flow_name": "Azure -> AWS private: AKS -> fw -> VPN -> TGW -> fw-a/b -> app spoke, and back"
+    },
+    {
+     "flow": "dns-aws-to-azure",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "aws-vpn-c0"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "2 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 3.0,
+     "flow_name": "Cross-cloud DNS: EKS asks az.cloudbridge.internal -> Azure fw forwarder"
+    },
+    {
+     "flow": "dns-azure-to-aws",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "aws-vpn-c0"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "2 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 3.0,
+     "flow_name": "Cross-cloud DNS: Azure fw forwarder asks cloudbridge.internal -> AWS fw forwarders"
+    },
+    {
+     "flow": "aws-to-azure-blob",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "aws-vpn-c0"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "2 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 1.5,
+     "flow_name": "Private access: EKS -> Azure Storage Private Endpoint over the VPN"
+    },
+    {
+     "flow": "azure-to-s3",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "aws-vpn-c0"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "2 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 1.5,
+     "flow_name": "Private access: AKS -> S3 interface endpoint over the VPN"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "vpn-connection",
+   "fixes": [
+    {
+     "mitigation": "Already 4 tunnels with ECMP; replace one VPN connection at a time (terraform apply -target), never both in one apply",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 32
+  },
+  "aws-vpn-c1": {
+   "component": "aws-vpn-c1",
+   "name": "AWS VPN connection c1 (to Azure instance1)",
+   "cloud": "aws",
+   "layer": "connectivity/vpn",
+   "planned_layer": null,
+   "status": "built",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 14.25,
+   "band": "low",
+   "worst_status": "degraded",
+   "recovery": "auto",
+   "recovery_s": 30.0,
+   "redundancy_s": null,
+   "summary": "users recover in ~30 s; redundancy is reduced until the component is fixed",
+   "failure_mode": "silent",
+   "failure_modes": {
+    "clean": {
+     "name": "clean withdrawal",
+     "cause": "connection replaced or deleted through the API (Terraform): the BGP sessions are torn down",
+     "severity": 0.0,
+     "worst_status": "ok",
+     "recovery": "none",
+     "recovery_s": 0.0,
+     "redundancy_s": null,
+     "summary": "no flow loses packets; redundancy is reduced until the component is fixed",
+     "flows": [
+      {
+       "flow": "aws-to-azure-blob",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "azure-to-aws",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "azure-to-s3",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "dns-aws-to-azure",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "dns-azure-to-aws",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      }
+     ]
+    },
+    "silent": {
+     "name": "silent failure",
+     "cause": "the AWS tunnel endpoints fail without a NOTIFICATION",
+     "severity": 14.25,
+     "worst_status": "degraded",
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_s": null,
+     "summary": "users recover in ~30 s; redundancy is reduced until the component is fixed",
+     "flows": [
+      {
+       "flow": "azure-to-aws",
+       "status": "degraded",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 5.25
+      },
+      {
+       "flow": "dns-aws-to-azure",
+       "status": "degraded",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 3.0
+      },
+      {
+       "flow": "dns-azure-to-aws",
+       "status": "degraded",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 3.0
+      },
+      {
+       "flow": "aws-to-azure-blob",
+       "status": "degraded",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 1.5
+      },
+      {
+       "flow": "azure-to-s3",
+       "status": "degraded",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "severity": 1.5
+      }
+     ]
+    }
+   },
+   "flows": [
+    {
+     "flow": "azure-to-aws",
+     "weight": 7,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "aws-vpn-c1"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "2 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 5.25,
+     "flow_name": "Azure -> AWS private: AKS -> fw -> VPN -> TGW -> fw-a/b -> app spoke, and back"
+    },
+    {
+     "flow": "dns-aws-to-azure",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "aws-vpn-c1"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "2 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 3.0,
+     "flow_name": "Cross-cloud DNS: EKS asks az.cloudbridge.internal -> Azure fw forwarder"
+    },
+    {
+     "flow": "dns-azure-to-aws",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "aws-vpn-c1"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "2 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 3.0,
+     "flow_name": "Cross-cloud DNS: Azure fw forwarder asks cloudbridge.internal -> AWS fw forwarders"
+    },
+    {
+     "flow": "aws-to-azure-blob",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "aws-vpn-c1"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "2 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 1.5,
+     "flow_name": "Private access: EKS -> Azure Storage Private Endpoint over the VPN"
+    },
+    {
+     "flow": "azure-to-s3",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "aws-vpn-c1"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "2 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 1.5,
+     "flow_name": "Private access: AKS -> S3 interface endpoint over the VPN"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "vpn-connection",
+   "fixes": [
+    {
+     "mitigation": "Already 4 tunnels with ECMP; replace one VPN connection at a time (terraform apply -target), never both in one apply",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 33
+  },
+  "vpn-c0-t1": {
+   "component": "vpn-c0-t1",
+   "name": "Tunnel c0-t1 169.254.21.0/30",
+   "cloud": "cross",
+   "layer": "connectivity/vpn",
+   "planned_layer": null,
+   "status": "built",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 7.12,
+   "band": "low",
+   "worst_status": "degraded",
+   "recovery": "auto",
+   "recovery_s": 30.0,
+   "redundancy_s": null,
+   "summary": "users recover in ~30 s; redundancy is reduced until the component is fixed",
+   "failure_mode": "silent",
+   "failure_modes": {
+    "clean": {
+     "name": "clean withdrawal",
+     "cause": "BGP config mismatch or admin shutdown on this tunnel (Test 3 bgp-break)",
+     "severity": 0.0,
+     "worst_status": "ok",
+     "recovery": "none",
+     "recovery_s": 0.0,
+     "redundancy_s": null,
+     "summary": "no flow loses packets; redundancy is reduced until the component is fixed",
+     "flows": [
+      {
+       "flow": "aws-to-azure-blob",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "azure-to-aws",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "azure-to-s3",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "dns-aws-to-azure",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "dns-azure-to-aws",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      }
+     ]
+    },
+    "silent": {
+     "name": "silent failure",
+     "cause": "the tunnel's far end dies without a NOTIFICATION",
+     "severity": 7.12,
+     "worst_status": "degraded",
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_s": null,
+     "summary": "users recover in ~30 s; redundancy is reduced until the component is fixed",
+     "flows": [
+      {
+       "flow": "azure-to-aws",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 2.62
+      },
+      {
+       "flow": "dns-aws-to-azure",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 1.5
+      },
+      {
+       "flow": "dns-azure-to-aws",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 1.5
+      },
+      {
+       "flow": "aws-to-azure-blob",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.75
+      },
+      {
+       "flow": "azure-to-s3",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.75
+      }
+     ]
+    }
+   },
+   "flows": [
+    {
+     "flow": "azure-to-aws",
+     "weight": 7,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c0-t1"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 2.62,
+     "flow_name": "Azure -> AWS private: AKS -> fw -> VPN -> TGW -> fw-a/b -> app spoke, and back"
+    },
+    {
+     "flow": "dns-aws-to-azure",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c0-t1"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 1.5,
+     "flow_name": "Cross-cloud DNS: EKS asks az.cloudbridge.internal -> Azure fw forwarder"
+    },
+    {
+     "flow": "dns-azure-to-aws",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c0-t1"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 1.5,
+     "flow_name": "Cross-cloud DNS: Azure fw forwarder asks cloudbridge.internal -> AWS fw forwarders"
+    },
+    {
+     "flow": "aws-to-azure-blob",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c0-t1"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 0.75,
+     "flow_name": "Private access: EKS -> Azure Storage Private Endpoint over the VPN"
+    },
+    {
+     "flow": "azure-to-s3",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c0-t1"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 0.75,
+     "flow_name": "Private access: AKS -> S3 interface endpoint over the VPN"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "vpn-connection",
+   "fixes": [
+    {
+     "mitigation": "Already 4 tunnels with ECMP; replace one VPN connection at a time (terraform apply -target), never both in one apply",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 38
+  },
+  "vpn-c0-t2": {
+   "component": "vpn-c0-t2",
+   "name": "Tunnel c0-t2 169.254.22.0/30",
+   "cloud": "cross",
+   "layer": "connectivity/vpn",
+   "planned_layer": null,
+   "status": "built",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 7.12,
+   "band": "low",
+   "worst_status": "degraded",
+   "recovery": "auto",
+   "recovery_s": 30.0,
+   "redundancy_s": null,
+   "summary": "users recover in ~30 s; redundancy is reduced until the component is fixed",
+   "failure_mode": "silent",
+   "failure_modes": {
+    "clean": {
+     "name": "clean withdrawal",
+     "cause": "BGP config mismatch or admin shutdown on this tunnel (Test 3 bgp-break)",
+     "severity": 0.0,
+     "worst_status": "ok",
+     "recovery": "none",
+     "recovery_s": 0.0,
+     "redundancy_s": null,
+     "summary": "no flow loses packets; redundancy is reduced until the component is fixed",
+     "flows": [
+      {
+       "flow": "aws-to-azure-blob",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "azure-to-aws",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "azure-to-s3",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "dns-aws-to-azure",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "dns-azure-to-aws",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      }
+     ]
+    },
+    "silent": {
+     "name": "silent failure",
+     "cause": "the tunnel's far end dies without a NOTIFICATION",
+     "severity": 7.12,
+     "worst_status": "degraded",
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_s": null,
+     "summary": "users recover in ~30 s; redundancy is reduced until the component is fixed",
+     "flows": [
+      {
+       "flow": "azure-to-aws",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 2.62
+      },
+      {
+       "flow": "dns-aws-to-azure",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 1.5
+      },
+      {
+       "flow": "dns-azure-to-aws",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 1.5
+      },
+      {
+       "flow": "aws-to-azure-blob",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.75
+      },
+      {
+       "flow": "azure-to-s3",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.75
+      }
+     ]
+    }
+   },
+   "flows": [
+    {
+     "flow": "azure-to-aws",
+     "weight": 7,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c0-t2"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 2.62,
+     "flow_name": "Azure -> AWS private: AKS -> fw -> VPN -> TGW -> fw-a/b -> app spoke, and back"
+    },
+    {
+     "flow": "dns-aws-to-azure",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c0-t2"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 1.5,
+     "flow_name": "Cross-cloud DNS: EKS asks az.cloudbridge.internal -> Azure fw forwarder"
+    },
+    {
+     "flow": "dns-azure-to-aws",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c0-t2"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 1.5,
+     "flow_name": "Cross-cloud DNS: Azure fw forwarder asks cloudbridge.internal -> AWS fw forwarders"
+    },
+    {
+     "flow": "aws-to-azure-blob",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c0-t2"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 0.75,
+     "flow_name": "Private access: EKS -> Azure Storage Private Endpoint over the VPN"
+    },
+    {
+     "flow": "azure-to-s3",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c0-t2"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 0.75,
+     "flow_name": "Private access: AKS -> S3 interface endpoint over the VPN"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "vpn-connection",
+   "fixes": [
+    {
+     "mitigation": "Already 4 tunnels with ECMP; replace one VPN connection at a time (terraform apply -target), never both in one apply",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 39
+  },
+  "vpn-c1-t1": {
+   "component": "vpn-c1-t1",
+   "name": "Tunnel c1-t1 169.254.21.4/30",
+   "cloud": "cross",
+   "layer": "connectivity/vpn",
+   "planned_layer": null,
+   "status": "built",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 7.12,
+   "band": "low",
+   "worst_status": "degraded",
+   "recovery": "auto",
+   "recovery_s": 30.0,
+   "redundancy_s": null,
+   "summary": "users recover in ~30 s; redundancy is reduced until the component is fixed",
+   "failure_mode": "silent",
+   "failure_modes": {
+    "clean": {
+     "name": "clean withdrawal",
+     "cause": "BGP config mismatch or admin shutdown on this tunnel (Test 3 bgp-break)",
+     "severity": 0.0,
+     "worst_status": "ok",
+     "recovery": "none",
+     "recovery_s": 0.0,
+     "redundancy_s": null,
+     "summary": "no flow loses packets; redundancy is reduced until the component is fixed",
+     "flows": [
+      {
+       "flow": "aws-to-azure-blob",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "azure-to-aws",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "azure-to-s3",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "dns-aws-to-azure",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "dns-azure-to-aws",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      }
+     ]
+    },
+    "silent": {
+     "name": "silent failure",
+     "cause": "the tunnel's far end dies without a NOTIFICATION",
+     "severity": 7.12,
+     "worst_status": "degraded",
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_s": null,
+     "summary": "users recover in ~30 s; redundancy is reduced until the component is fixed",
+     "flows": [
+      {
+       "flow": "azure-to-aws",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 2.62
+      },
+      {
+       "flow": "dns-aws-to-azure",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 1.5
+      },
+      {
+       "flow": "dns-azure-to-aws",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 1.5
+      },
+      {
+       "flow": "aws-to-azure-blob",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.75
+      },
+      {
+       "flow": "azure-to-s3",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.75
+      }
+     ]
+    }
+   },
+   "flows": [
+    {
+     "flow": "azure-to-aws",
+     "weight": 7,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c1-t1"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 2.62,
+     "flow_name": "Azure -> AWS private: AKS -> fw -> VPN -> TGW -> fw-a/b -> app spoke, and back"
+    },
+    {
+     "flow": "dns-aws-to-azure",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c1-t1"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 1.5,
+     "flow_name": "Cross-cloud DNS: EKS asks az.cloudbridge.internal -> Azure fw forwarder"
+    },
+    {
+     "flow": "dns-azure-to-aws",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c1-t1"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 1.5,
+     "flow_name": "Cross-cloud DNS: Azure fw forwarder asks cloudbridge.internal -> AWS fw forwarders"
+    },
+    {
+     "flow": "aws-to-azure-blob",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c1-t1"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 0.75,
+     "flow_name": "Private access: EKS -> Azure Storage Private Endpoint over the VPN"
+    },
+    {
+     "flow": "azure-to-s3",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c1-t1"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 0.75,
+     "flow_name": "Private access: AKS -> S3 interface endpoint over the VPN"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "vpn-connection",
+   "fixes": [
+    {
+     "mitigation": "Already 4 tunnels with ECMP; replace one VPN connection at a time (terraform apply -target), never both in one apply",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 40
+  },
+  "vpn-c1-t2": {
+   "component": "vpn-c1-t2",
+   "name": "Tunnel c1-t2 169.254.22.4/30",
+   "cloud": "cross",
+   "layer": "connectivity/vpn",
+   "planned_layer": null,
+   "status": "built",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 7.12,
+   "band": "low",
+   "worst_status": "degraded",
+   "recovery": "auto",
+   "recovery_s": 30.0,
+   "redundancy_s": null,
+   "summary": "users recover in ~30 s; redundancy is reduced until the component is fixed",
+   "failure_mode": "silent",
+   "failure_modes": {
+    "clean": {
+     "name": "clean withdrawal",
+     "cause": "BGP config mismatch or admin shutdown on this tunnel (Test 3 bgp-break)",
+     "severity": 0.0,
+     "worst_status": "ok",
+     "recovery": "none",
+     "recovery_s": 0.0,
+     "redundancy_s": null,
+     "summary": "no flow loses packets; redundancy is reduced until the component is fixed",
+     "flows": [
+      {
+       "flow": "aws-to-azure-blob",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "azure-to-aws",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "azure-to-s3",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "dns-aws-to-azure",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      },
+      {
+       "flow": "dns-azure-to-aws",
+       "status": "ok",
+       "impact_pct": 0.0,
+       "recovery": "none",
+       "recovery_s": null,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.0
+      }
+     ]
+    },
+    "silent": {
+     "name": "silent failure",
+     "cause": "the tunnel's far end dies without a NOTIFICATION",
+     "severity": 7.12,
+     "worst_status": "degraded",
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_s": null,
+     "summary": "users recover in ~30 s; redundancy is reduced until the component is fixed",
+     "flows": [
+      {
+       "flow": "azure-to-aws",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 2.62
+      },
+      {
+       "flow": "dns-aws-to-azure",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 1.5
+      },
+      {
+       "flow": "dns-azure-to-aws",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 1.5
+      },
+      {
+       "flow": "aws-to-azure-blob",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.75
+      },
+      {
+       "flow": "azure-to-s3",
+       "status": "degraded",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "severity": 0.75
+      }
+     ]
+    }
+   },
+   "flows": [
+    {
+     "flow": "azure-to-aws",
+     "weight": 7,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c1-t2"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 2.62,
+     "flow_name": "Azure -> AWS private: AKS -> fw -> VPN -> TGW -> fw-a/b -> app spoke, and back"
+    },
+    {
+     "flow": "dns-aws-to-azure",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c1-t2"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 1.5,
+     "flow_name": "Cross-cloud DNS: EKS asks az.cloudbridge.internal -> Azure fw forwarder"
+    },
+    {
+     "flow": "dns-azure-to-aws",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c1-t2"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 1.5,
+     "flow_name": "Cross-cloud DNS: Azure fw forwarder asks cloudbridge.internal -> AWS fw forwarders"
+    },
+    {
+     "flow": "aws-to-azure-blob",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c1-t2"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 0.75,
+     "flow_name": "Private access: EKS -> Azure Storage Private Endpoint over the VPN"
+    },
+    {
+     "flow": "azure-to-s3",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 25.0,
+     "recovery": "auto",
+     "recovery_s": 30.0,
+     "redundancy_lost_pct": 25.0,
+     "redundancy_s": null,
+     "failure_mode": "silent",
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "vpn-tunnels",
+       "impact_pct": 25.0,
+       "recovery": "auto",
+       "recovery_s": 30.0,
+       "lost": [
+        "vpn-c1-t2"
+       ],
+       "redundancy_lost_pct": 25.0,
+       "redundancy_s": null,
+       "failure_mode": "silent",
+       "note": "3 of 4 members carry the traffic (silent failure)"
+      }
+     ],
+     "severity": 0.75,
+     "flow_name": "Private access: AKS -> S3 interface endpoint over the VPN"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "vpn-connection",
+   "fixes": [
+    {
+     "mitigation": "Already 4 tunnels with ECMP; replace one VPN connection at a time (terraform apply -target), never both in one apply",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 41
+  },
+  "aws-alb": {
+   "component": "aws-alb",
+   "name": "ALB (made by the AWS LB controller)",
+   "cloud": "aws",
+   "layer": "planned",
+   "planned_layer": "aws/eks",
+   "status": "planned",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 45.0,
+   "band": "medium",
+   "worst_status": "broken",
+   "recovery": "provider",
+   "recovery_s": null,
+   "redundancy_s": null,
+   "summary": "users stay affected until the provider restores it",
+   "failure_mode": null,
+   "failure_modes": {},
+   "flows": [
+    {
+     "flow": "users-app",
+     "weight": 10,
+     "status": "degraded",
+     "impact_pct": 100.0,
+     "recovery": "auto",
+     "recovery_s": 90.0,
+     "redundancy_lost_pct": 0.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "aws-ingress broken; DNS health checks move users to azure-ingress",
+     "hops_hit": [
+      {
+       "hop": "aws-alb",
+       "impact_pct": 100.0,
+       "recovery": "provider",
+       "recovery_s": null,
+       "lost": [
+        "aws-alb"
+       ]
+      }
+     ],
+     "severity": 25.0,
+     "flow_name": "Users -> app.jeevs.click (AWS active, Azure failover via DNS health checks)"
+    },
+    {
+     "flow": "aws-ingress",
+     "weight": 5,
+     "status": "broken",
+     "impact_pct": 100.0,
+     "recovery": "provider",
+     "recovery_s": null,
+     "redundancy_lost_pct": 0.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "aws-alb",
+       "impact_pct": 100.0,
+       "recovery": "provider",
+       "recovery_s": null,
+       "lost": [
+        "aws-alb"
+       ]
+      }
+     ],
+     "severity": 20.0,
+     "flow_name": "Users -> ALB -> EKS (active path)"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "managed-service",
+   "fixes": [
+    {
+     "mitigation": "Accept: provider-run multi-AZ service; covered by the cross-cloud DNS failover where it is on the user path",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 16
+  },
+  "eks-node-a": {
+   "component": "eks-node-a",
+   "name": "EKS Spot node in 2a (app pods)",
+   "cloud": "aws",
+   "layer": "planned",
+   "planned_layer": "aws/eks",
+   "status": "planned",
+   "kind": "vm",
+   "section": "infrastructure",
+   "severity": 32.19,
+   "band": "medium",
+   "worst_status": "degraded",
+   "recovery": "auto",
+   "recovery_s": 57.0,
+   "redundancy_s": null,
+   "summary": "users recover in ~57 s; redundancy is reduced until the component is fixed",
+   "failure_mode": null,
+   "failure_modes": {},
+   "flows": [
+    {
+     "flow": "users-app",
+     "weight": 10,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 57.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "eks-workload",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 57.0,
+       "lost": [
+        "eks-node-a"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 9.75,
+     "flow_name": "Users -> app.jeevs.click (AWS active, Azure failover via DNS health checks)"
+    },
+    {
+     "flow": "azure-to-aws",
+     "weight": 7,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 57.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "eks-workload",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 57.0,
+       "lost": [
+        "eks-node-a"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 6.83,
+     "flow_name": "Azure -> AWS private: AKS -> fw -> VPN -> TGW -> fw-a/b -> app spoke, and back"
+    },
+    {
+     "flow": "aws-egress",
+     "weight": 5,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 57.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "eks-workload",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 57.0,
+       "lost": [
+        "eks-node-a"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 4.88,
+     "flow_name": "AWS egress: EKS -> TGW -> fw-a/b NAT -> internet"
+    },
+    {
+     "flow": "aws-ingress",
+     "weight": 5,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 57.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "eks-workload",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 57.0,
+       "lost": [
+        "eks-node-a"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 4.88,
+     "flow_name": "Users -> ALB -> EKS (active path)"
+    },
+    {
+     "flow": "dns-aws-to-azure",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 57.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "eks-workload",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 57.0,
+       "lost": [
+        "eks-node-a"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 3.9,
+     "flow_name": "Cross-cloud DNS: EKS asks az.cloudbridge.internal -> Azure fw forwarder"
+    },
+    {
+     "flow": "aws-to-azure-blob",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 57.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "eks-workload",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 57.0,
+       "lost": [
+        "eks-node-a"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 1.95,
+     "flow_name": "Private access: EKS -> Azure Storage Private Endpoint over the VPN"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "spot-node",
+   "fixes": [
+    {
+     "mitigation": "Already 2 nodes; use 2+ instance types in the Spot node group so one Spot pool running dry doesn't take both",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 20
+  },
+  "eks-node-b": {
+   "component": "eks-node-b",
+   "name": "EKS Spot node in 2b (app pods)",
+   "cloud": "aws",
+   "layer": "planned",
+   "planned_layer": "aws/eks",
+   "status": "planned",
+   "kind": "vm",
+   "section": "infrastructure",
+   "severity": 32.19,
+   "band": "medium",
+   "worst_status": "degraded",
+   "recovery": "auto",
+   "recovery_s": 57.0,
+   "redundancy_s": null,
+   "summary": "users recover in ~57 s; redundancy is reduced until the component is fixed",
+   "failure_mode": null,
+   "failure_modes": {},
+   "flows": [
+    {
+     "flow": "users-app",
+     "weight": 10,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 57.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "eks-workload",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 57.0,
+       "lost": [
+        "eks-node-b"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 9.75,
+     "flow_name": "Users -> app.jeevs.click (AWS active, Azure failover via DNS health checks)"
+    },
+    {
+     "flow": "azure-to-aws",
+     "weight": 7,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 57.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "eks-workload",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 57.0,
+       "lost": [
+        "eks-node-b"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 6.83,
+     "flow_name": "Azure -> AWS private: AKS -> fw -> VPN -> TGW -> fw-a/b -> app spoke, and back"
+    },
+    {
+     "flow": "aws-egress",
+     "weight": 5,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 57.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "eks-workload",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 57.0,
+       "lost": [
+        "eks-node-b"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 4.88,
+     "flow_name": "AWS egress: EKS -> TGW -> fw-a/b NAT -> internet"
+    },
+    {
+     "flow": "aws-ingress",
+     "weight": 5,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 57.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "eks-workload",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 57.0,
+       "lost": [
+        "eks-node-b"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 4.88,
+     "flow_name": "Users -> ALB -> EKS (active path)"
+    },
+    {
+     "flow": "dns-aws-to-azure",
+     "weight": 4,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 57.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "eks-workload",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 57.0,
+       "lost": [
+        "eks-node-b"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 3.9,
+     "flow_name": "Cross-cloud DNS: EKS asks az.cloudbridge.internal -> Azure fw forwarder"
+    },
+    {
+     "flow": "aws-to-azure-blob",
+     "weight": 2,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 57.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "eks-workload",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 57.0,
+       "lost": [
+        "eks-node-b"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 1.95,
+     "flow_name": "Private access: EKS -> Azure Storage Private Endpoint over the VPN"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "spot-node",
+   "fixes": [
+    {
+     "mitigation": "Already 2 nodes; use 2+ instance types in the Spot node group so one Spot pool running dry doesn't take both",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 21
+  },
+  "dns-failover-r53": {
+   "component": "dns-failover-r53",
+   "name": "Route 53 health checks + failover records",
+   "cloud": "aws",
+   "layer": "planned",
+   "planned_layer": "global/dns",
+   "status": "planned",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 0.0,
+   "band": "none",
+   "worst_status": "ok",
+   "recovery": "none",
+   "recovery_s": null,
+   "redundancy_s": null,
+   "summary": "",
+   "failure_mode": null,
+   "failure_modes": {},
+   "flows": [],
+   "transition_risk": null,
+   "risk": "dns-health-check",
+   "fixes": [
+    {
+     "mitigation": "Already two independent health-check systems (Route 53, Traffic Manager)",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 42
+  },
+  "dns-failover-tm": {
+   "component": "dns-failover-tm",
+   "name": "Traffic Manager priority profile (behind the Azure DNS CNAME)",
+   "cloud": "azure",
+   "layer": "planned",
+   "planned_layer": "global/dns",
+   "status": "planned",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 0.0,
+   "band": "none",
+   "worst_status": "ok",
+   "recovery": "none",
+   "recovery_s": null,
+   "redundancy_s": null,
+   "summary": "",
+   "failure_mode": null,
+   "failure_modes": {},
+   "flows": [],
+   "transition_risk": null,
+   "risk": "dns-health-check",
+   "fixes": [
+    {
+     "mitigation": "Already two independent health-check systems (Route 53, Traffic Manager)",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 43
+  }
+ }
+}

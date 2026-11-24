@@ -1,0 +1,33 @@
+# frontend -> backend:8080, written on both ends: egress from the frontend and ingress to the
+# backend. Port 8080 is the container port (policies match after Service translation).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-egress-to-backend
+  namespace: cloudbridge
+spec:
+  podSelector:
+    matchLabels: { app: frontend }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: { app: backend }
+      ports:
+        - { protocol: TCP, port: 8080 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-ingress-from-frontend
+  namespace: cloudbridge
+spec:
+  podSelector:
+    matchLabels: { app: backend }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: frontend }
+      ports:
+        - { protocol: TCP, port: 8080 }

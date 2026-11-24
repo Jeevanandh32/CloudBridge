@@ -1,0 +1,450 @@
+{
+  "tool": "mindbridge predict",
+  "generated": "2026-11-23T18:33:04Z",
+  "since_s": 7200.0,
+  "samples": 2479,
+  "series": 82,
+  "collectors": [
+    {
+      "collector": "aws_firewalls",
+      "ts": "2026-11-23T18:28:29Z",
+      "status": "ok",
+      "message": "",
+      "samples": 14,
+      "duration_s": 6.56
+    },
+    {
+      "collector": "aws_spot",
+      "ts": "2026-11-23T18:32:29Z",
+      "status": "unavailable",
+      "message": "no Auto Scaling groups tagged eks:cluster-name=cloudbridge-eks (not deployed)",
+      "samples": 0,
+      "duration_s": 0.59
+    },
+    {
+      "collector": "aws_subnets",
+      "ts": "2026-11-23T18:33:04Z",
+      "status": "ok",
+      "message": "",
+      "samples": 10,
+      "duration_s": 0.69
+    },
+    {
+      "collector": "aws_vpn",
+      "ts": "2026-11-23T18:32:05Z",
+      "status": "ok",
+      "message": "",
+      "samples": 8,
+      "duration_s": 0.62
+    },
+    {
+      "collector": "aws_vpn_cloudwatch",
+      "ts": "2026-11-23T18:27:59Z",
+      "status": "ok",
+      "message": "",
+      "samples": 72,
+      "duration_s": 1.03
+    },
+    {
+      "collector": "azure_firewall",
+      "ts": "2026-11-23T18:29:01Z",
+      "status": "ok",
+      "message": "",
+      "samples": 11,
+      "duration_s": 32.11
+    },
+    {
+      "collector": "azure_quotas",
+      "ts": "2026-11-23T18:11:53Z",
+      "status": "ok",
+      "message": "",
+      "samples": 8,
+      "duration_s": 1.36
+    },
+    {
+      "collector": "azure_vpngw",
+      "ts": "2026-11-23T18:32:28Z",
+      "status": "ok",
+      "message": "",
+      "samples": 12,
+      "duration_s": 23.31
+    },
+    {
+      "collector": "budgets",
+      "ts": "2026-11-23T18:11:55Z",
+      "status": "ok",
+      "message": "",
+      "samples": 5,
+      "duration_s": 2.13
+    },
+    {
+      "collector": "domain",
+      "ts": "2026-11-23T17:11:38Z",
+      "status": "ok",
+      "message": "",
+      "samples": 2,
+      "duration_s": 0.62
+    },
+    {
+      "collector": "kubernetes",
+      "ts": "2026-11-23T18:32:29Z",
+      "status": "unavailable",
+      "message": "cloudbridge-eks: cluster unreachable (not deployed or endpoint gone); cloudbridge-aks: cluster unreachable (not deployed or endpoint gone)",
+      "samples": 0,
+      "duration_s": 0.75
+    }
+  ],
+  "method": "Deterministic detectors (detect.py): time-to-threshold (linear fit, R\u00b2 gate), EWMA baseline deviation (k of n), flap counter, countdown, quota headroom, sustained level. Impact from the what-if model (model.py) for the mapped component.",
+  "alerts": [
+    {
+      "id": "fw.nft_invalid_total/fw-a/baseline_deviation",
+      "signal": "fw.nft_invalid_total",
+      "component": "fw-a",
+      "detector": "baseline_deviation",
+      "severity": "warning",
+      "summary": "2 of last 3 samples off baseline 0 packets/min (std 1); latest 0 packets/min",
+      "eta_s": null,
+      "eta": null,
+      "deviation": 42.8287,
+      "metrics": {
+        "baseline_mean": 0.0,
+        "baseline_std": 1,
+        "k": 2,
+        "n": 3,
+        "latest": 0.0,
+        "sigma": 42.83
+      },
+      "at": "2026-11-23T18:28:22Z",
+      "evidence": [
+        {
+          "ts": "2026-11-23T18:18:22Z",
+          "value": 30.596,
+          "unit": "packets/min"
+        },
+        {
+          "ts": "2026-11-23T18:23:00Z",
+          "value": 42.8287,
+          "unit": "packets/min"
+        }
+      ],
+      "impact": {
+        "component": "fw-a",
+        "component_name": "AWS firewall fw-a (us-east-2a)",
+        "component_status": "built",
+        "total_severity": 102.17,
+        "band": "high",
+        "recovery": "manual",
+        "recovery_s": null,
+        "flows": [
+          {
+            "flow": "azure-to-aws",
+            "name": "Azure -> AWS private: AKS -> fw -> VPN -> TGW -> fw-a/b -> app spoke, and back",
+            "weight": 7,
+            "status": "degraded",
+            "impact_pct": 50.0,
+            "recovery": "manual",
+            "recovery_s": null,
+            "severity": 35.0
+          },
+          {
+            "flow": "aws-egress",
+            "name": "AWS egress: EKS -> TGW -> fw-a/b NAT -> internet",
+            "weight": 5,
+            "status": "degraded",
+            "impact_pct": 50.0,
+            "recovery": "manual",
+            "recovery_s": null,
+            "severity": 25.0
+          },
+          {
+            "flow": "dns-aws-to-azure",
+            "name": "Cross-cloud DNS: EKS asks az.cloudbridge.internal -> Azure fw forwarder",
+            "weight": 4,
+            "status": "degraded",
+            "impact_pct": 50.0,
+            "recovery": "manual",
+            "recovery_s": null,
+            "severity": 20.0
+          },
+          {
+            "flow": "aws-to-azure-blob",
+            "name": "Private access: EKS -> Azure Storage Private Endpoint over the VPN",
+            "weight": 2,
+            "status": "degraded",
+            "impact_pct": 50.0,
+            "recovery": "manual",
+            "recovery_s": null,
+            "severity": 10.0
+          },
+          {
+            "flow": "azure-to-s3",
+            "name": "Private access: AKS -> S3 interface endpoint over the VPN",
+            "weight": 2,
+            "status": "degraded",
+            "impact_pct": 50.0,
+            "recovery": "manual",
+            "recovery_s": null,
+            "severity": 10.0
+          },
+          {
+            "flow": "dns-azure-to-aws",
+            "name": "Cross-cloud DNS: Azure fw forwarder asks cloudbridge.internal -> AWS fw forwarders",
+            "weight": 4,
+            "status": "degraded",
+            "impact_pct": 50.0,
+            "recovery": "auto",
+            "recovery_s": 5.0,
+            "severity": 2.17
+          }
+        ],
+        "answer": "If fw-a fails: azure-to-aws degraded 50%, recovery manual (no automatic failover); aws-egress degraded 50%, recovery manual (no automatic failover); dns-aws-to-azure degraded 50%, recovery manual (no automatic failover); aws-to-azure-blob degraded 50%, recovery manual (no automatic failover); azure-to-s3 degraded 50%, recovery manual (no automatic failover); dns-azure-to-aws degraded 50%, recovery automatic in ~5 s."
+      }
+    },
+    {
+      "id": "fw.nft_invalid_total/fw-b/baseline_deviation",
+      "signal": "fw.nft_invalid_total",
+      "component": "fw-b",
+      "detector": "baseline_deviation",
+      "severity": "warning",
+      "summary": "2 of last 3 samples off baseline 0.12 packets/min (std 1); latest 0 packets/min",
+      "eta_s": null,
+      "eta": null,
+      "deviation": 36.4358,
+      "metrics": {
+        "baseline_mean": 0.1201,
+        "baseline_std": 1,
+        "k": 2,
+        "n": 3,
+        "latest": 0.0,
+        "sigma": 36.44
+      },
+      "at": "2026-11-23T18:28:22Z",
+      "evidence": [
+        {
+          "ts": "2026-11-23T18:18:22Z",
+          "value": 30.7921,
+          "unit": "packets/min"
+        },
+        {
+          "ts": "2026-11-23T18:23:00Z",
+          "value": 36.5558,
+          "unit": "packets/min"
+        }
+      ],
+      "impact": {
+        "component": "fw-b",
+        "component_name": "AWS firewall fw-b (us-east-2b)",
+        "component_status": "built",
+        "total_severity": 102.17,
+        "band": "high",
+        "recovery": "manual",
+        "recovery_s": null,
+        "flows": [
+          {
+            "flow": "azure-to-aws",
+            "name": "Azure -> AWS private: AKS -> fw -> VPN -> TGW -> fw-a/b -> app spoke, and back",
+            "weight": 7,
+            "status": "degraded",
+            "impact_pct": 50.0,
+            "recovery": "manual",
+            "recovery_s": null,
+            "severity": 35.0
+          },
+          {
+            "flow": "aws-egress",
+            "name": "AWS egress: EKS -> TGW -> fw-a/b NAT -> internet",
+            "weight": 5,
+            "status": "degraded",
+            "impact_pct": 50.0,
+            "recovery": "manual",
+            "recovery_s": null,
+            "severity": 25.0
+          },
+          {
+            "flow": "dns-aws-to-azure",
+            "name": "Cross-cloud DNS: EKS asks az.cloudbridge.internal -> Azure fw forwarder",
+            "weight": 4,
+            "status": "degraded",
+            "impact_pct": 50.0,
+            "recovery": "manual",
+            "recovery_s": null,
+            "severity": 20.0
+          },
+          {
+            "flow": "aws-to-azure-blob",
+            "name": "Private access: EKS -> Azure Storage Private Endpoint over the VPN",
+            "weight": 2,
+            "status": "degraded",
+            "impact_pct": 50.0,
+            "recovery": "manual",
+            "recovery_s": null,
+            "severity": 10.0
+          },
+          {
+            "flow": "azure-to-s3",
+            "name": "Private access: AKS -> S3 interface endpoint over the VPN",
+            "weight": 2,
+            "status": "degraded",
+            "impact_pct": 50.0,
+            "recovery": "manual",
+            "recovery_s": null,
+            "severity": 10.0
+          },
+          {
+            "flow": "dns-azure-to-aws",
+            "name": "Cross-cloud DNS: Azure fw forwarder asks cloudbridge.internal -> AWS fw forwarders",
+            "weight": 4,
+            "status": "degraded",
+            "impact_pct": 50.0,
+            "recovery": "auto",
+            "recovery_s": 5.0,
+            "severity": 2.17
+          }
+        ],
+        "answer": "If fw-b fails: azure-to-aws degraded 50%, recovery manual (no automatic failover); aws-egress degraded 50%, recovery manual (no automatic failover); dns-aws-to-azure degraded 50%, recovery manual (no automatic failover); aws-to-azure-blob degraded 50%, recovery manual (no automatic failover); azure-to-s3 degraded 50%, recovery manual (no automatic failover); dns-azure-to-aws degraded 50%, recovery automatic in ~5 s."
+      }
+    },
+    {
+      "id": "quota.azure_public_ips/northcentralus/quota_headroom",
+      "signal": "quota.azure_public_ips",
+      "component": "northcentralus",
+      "detector": "quota_headroom",
+      "severity": "warning",
+      "summary": "3 of 3 used, 0 free",
+      "eta_s": null,
+      "eta": null,
+      "deviation": 0.0,
+      "metrics": {
+        "used": 3.0,
+        "limit": 3.0,
+        "free": 0.0,
+        "warn_free": 0
+      },
+      "at": "2026-11-23T18:11:52Z",
+      "evidence": [
+        {
+          "ts": "2026-11-23T18:11:52Z",
+          "value": 3.0,
+          "unit": "count"
+        }
+      ],
+      "impact": {
+        "component": null,
+        "flows": [],
+        "note": "Not a component failure: any new public IP in northcentralus fails to create. Blocks the fixes that need one.",
+        "fixes_needing_it": [
+          "Second firewall VM behind an Azure internal Standard LB (HA ports), UDRs to the LB frontend (needs 1)",
+          "Azure Firewall Basic instead of the VM (needs 1)"
+        ],
+        "answer": "Not a component failure: any new public IP in northcentralus fails to create. Blocks the fixes that need one. Fixes that need it: Second firewall VM behind an Azure internal Standard LB (HA ports), UDRs to the LB frontend (needs 1); Azure Firewall Basic instead of the VM (needs 1)."
+      }
+    },
+    {
+      "id": "vpn.cw_tunnel_state/vpn-c0-t1/flap_counter",
+      "signal": "vpn.cw_tunnel_state",
+      "component": "vpn-c0-t1",
+      "detector": "flap_counter",
+      "severity": "warning",
+      "summary": "5 state changes in 2.0 h; now 1",
+      "eta_s": null,
+      "eta": null,
+      "deviation": 5.0,
+      "metrics": {
+        "changes": 5,
+        "window_s": 7200.0,
+        "max_changes": 4,
+        "current": 1.0
+      },
+      "at": "2026-11-23T18:22:00Z",
+      "evidence": [
+        {
+          "ts": "2026-11-23T17:06:00Z",
+          "value": 1.0,
+          "unit": "state"
+        },
+        {
+          "ts": "2026-11-23T17:17:00Z",
+          "value": 0.0,
+          "unit": "state"
+        },
+        {
+          "ts": "2026-11-23T17:27:00Z",
+          "value": 1.0,
+          "unit": "state"
+        },
+        {
+          "ts": "2026-11-23T17:31:00Z",
+          "value": 0.0,
+          "unit": "state"
+        },
+        {
+          "ts": "2026-11-23T17:47:00Z",
+          "value": 1.0,
+          "unit": "state"
+        }
+      ],
+      "impact": {
+        "component": "vpn-c0-t1",
+        "component_name": "Tunnel c0-t1 169.254.21.0/30",
+        "component_status": "built",
+        "total_severity": 11.88,
+        "band": "low",
+        "recovery": "auto",
+        "recovery_s": 90.0,
+        "flows": [
+          {
+            "flow": "azure-to-aws",
+            "name": "Azure -> AWS private: AKS -> fw -> VPN -> TGW -> fw-a/b -> app spoke, and back",
+            "weight": 7,
+            "status": "degraded",
+            "impact_pct": 25.0,
+            "recovery": "auto",
+            "recovery_s": 90.0,
+            "severity": 4.38
+          },
+          {
+            "flow": "dns-aws-to-azure",
+            "name": "Cross-cloud DNS: EKS asks az.cloudbridge.internal -> Azure fw forwarder",
+            "weight": 4,
+            "status": "degraded",
+            "impact_pct": 25.0,
+            "recovery": "auto",
+            "recovery_s": 90.0,
+            "severity": 2.5
+          },
+          {
+            "flow": "dns-azure-to-aws",
+            "name": "Cross-cloud DNS: Azure fw forwarder asks cloudbridge.internal -> AWS fw forwarders",
+            "weight": 4,
+            "status": "degraded",
+            "impact_pct": 25.0,
+            "recovery": "auto",
+            "recovery_s": 90.0,
+            "severity": 2.5
+          },
+          {
+            "flow": "aws-to-azure-blob",
+            "name": "Private access: EKS -> Azure Storage Private Endpoint over the VPN",
+            "weight": 2,
+            "status": "degraded",
+            "impact_pct": 25.0,
+            "recovery": "auto",
+            "recovery_s": 90.0,
+            "severity": 1.25
+          },
+          {
+            "flow": "azure-to-s3",
+            "name": "Private access: AKS -> S3 interface endpoint over the VPN",
+            "weight": 2,
+            "status": "degraded",
+            "impact_pct": 25.0,
+            "recovery": "auto",
+            "recovery_s": 90.0,
+            "severity": 1.25
+          }
+        ],
+        "answer": "If vpn-c0-t1 fails: azure-to-aws degraded 25%, recovery automatic in ~90 s; dns-aws-to-azure degraded 25%, recovery automatic in ~90 s; dns-azure-to-aws degraded 25%, recovery automatic in ~90 s; aws-to-azure-blob degraded 25%, recovery automatic in ~90 s; azure-to-s3 degraded 25%, recovery automatic in ~90 s."
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+
+== Evidence 1: invalid-state drops on each firewall since the break
+-- fw-a
+fw-invalid log lines: 0
+fw-drop    log lines: 0
+		ct state invalid counter packets 50 bytes 3000 log prefix "fw-invalid " level info drop
+		counter packets 0 bytes 0 log prefix "fw-drop " level info drop
+
+-- fw-b
+fw-invalid log lines: 0
+fw-drop    log lines: 0
+		ct state invalid counter packets 39 bytes 2340 log prefix "fw-invalid " level info drop
+		counter packets 0 bytes 0 log prefix "fw-drop " level info drop
+
+   A reply (SYN-ACK) that reaches the firewall which never saw the SYN is 'ct state invalid'.
+
+== Evidence 2: conntrack on each firewall during the curls (Azure fw -> port 80)
+   SYN_SENT [UNREPLIED] = this firewall forwarded the SYN but the reply went to the other one
+-- fw-a
+flows seen: 176   by last state: TIME_WAIT=176
+
+-- fw-b
+flows seen: 224   by last state: TIME_WAIT=224
+
+
+== Evidence 3: inspection VPC flow logs (S3): which firewall saw the request vs the reply
+bucket cloudbridge-flowlogs-dbc7debc4975b89fac52c215c4, inspection VPC vpc-0912cc71973a94bd2, flow log fl-0b9f47317bd71393c
+eni-025ba7f5a085e6ed9	fw-b
+eni-03214c7fac6e7cb9a	fw-a
+eni-075ad67e254310c65 tgw-eni-us-east-2a
+eni-0aa3be54fa9317e22 tgw-eni-us-east-2b
+waiting for flow log files in s3://cloudbridge-flowlogs-dbc7debc4975b89fac52c215c4 (up to 15 min)...
+flows: 400  symmetric: 400  ASYMMETRIC: 0  not in logs yet: 0
+  symmetric : 400 flows,   0 curl failures
+reply records with action REJECT: 0
+  (expected 0: the firewall security group accepts 10/8, so the VPC logs the stray reply
+   as ACCEPT on the wrong firewall's ENI; nftables drops it inside the VM as fw-invalid)

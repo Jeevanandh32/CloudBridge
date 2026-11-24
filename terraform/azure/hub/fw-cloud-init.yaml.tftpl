@@ -1,0 +1,88 @@
+#cloud-config
+# Azure hub firewall VM: routing, stateful filtering, SNAT out, DNAT in, MSS clamp, DNS forwarding.
+package_update: true
+packages:
+  - dnsmasq
+  - tcpdump
+  - conntrack
+
+write_files:
+  - path: /etc/sysctl.d/90-cloudbridge.conf
+    content: |
+      net.ipv4.ip_forward = 1
+      net.ipv4.conf.all.rp_filter = 2
+      net.ipv4.conf.default.rp_filter = 2
+
+  - path: /etc/nftables.conf
+    content: |
+      #!/usr/sbin/nft -f
+      flush ruleset
+
+      table inet fw {
+        chain input {
+          type filter hook input priority 0; policy accept;
+        }
+
+        chain forward {
+          type filter hook forward priority 0; policy drop;
+          ct state established,related accept
+          ct state invalid counter log prefix "fw-invalid " level info drop
+          # Inbound users and health checks, translated to the AKS internal LB
+          ct status dnat counter accept
+          ip saddr 10.0.0.0/8 ct state new counter accept
+          counter log prefix "fw-drop " level info drop
+        }
+
+        chain mss {
+          type filter hook forward priority mangle; policy accept;
+          ip daddr 10.10.0.0/16 tcp flags syn tcp option maxseg size set ${mss}
+          ip saddr 10.10.0.0/16 tcp flags syn tcp option maxseg size set ${mss}
+        }
+      }
+
+      table ip nat {
+        # Internet -> public IP (Azure maps it to ${fw_ip}) -> AKS internal LB
+        chain prerouting {
+          type nat hook prerouting priority dstnat; policy accept;
+          ip daddr ${fw_ip} ip saddr != 10.0.0.0/8 tcp dport 80 counter dnat to ${ilb_ip}:80
+        }
+
+        chain postrouting {
+          type nat hook postrouting priority srcnat; policy accept;
+          # Private -> internet: Azure maps this VM's IP to the public IP
+          ip saddr 10.0.0.0/8 ip daddr != 10.0.0.0/8 counter masquerade
+          # Private Endpoint replies don't follow UDRs back, so SNAT keeps the flow symmetric
+          ip daddr ${pe_subnet} counter masquerade
+          # Inbound DNAT to the AKS ILB is SNATed too, as Azure Firewall does for DNAT.
+          # The ILB rule has floating IP off, so Azure rewrites the destination to the node IP,
+          # and the AKS node NSG only admits VirtualNetwork sources. An internet client IP is
+          # dropped before the node sees it (found in Session 2). SNAT also guarantees that the
+          # reply returns through this firewall. Trade-off: the app sees the firewall IP.
+          ip daddr ${ilb_ip} ct status dnat counter masquerade
+        }
+      }
+
+  - path: /etc/dnsmasq.d/cloudbridge.conf
+    content: |
+      # Hybrid DNS forwarder (instead of Azure DNS Private Resolver)
+      listen-address=${fw_ip}
+      bind-interfaces
+      no-resolv
+      # Azure's own private zone stays local. dnsmasq matches subdomains, so without this
+      # line az.cloudbridge.internal would match cloudbridge.internal below and loop back to AWS.
+      server=/az.cloudbridge.internal/168.63.129.16
+      # AWS private zone -> AWS firewalls' forwarders -> VPC resolver
+%{ for ip in aws_fw_ips ~}
+      server=/cloudbridge.internal/${ip}
+%{ endfor ~}
+      # Everything else, including linked private zones -> Azure DNS
+      server=168.63.129.16
+      log-queries
+      log-facility=/var/log/dnsmasq.log
+
+runcmd:
+  - sysctl --system
+  - systemctl enable --now nftables
+  - nft -f /etc/nftables.conf
+  - systemctl restart dnsmasq
+  - systemctl enable dnsmasq

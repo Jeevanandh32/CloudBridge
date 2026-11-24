@@ -1,5 +1,7 @@
+# v1 ONLY (the node-failure test was cut from the current tests). Kept because it still renders on
+# top of overlays/aws: `k8s/deploy.sh aws-tuned` works, but no current test uses it.
 # Same as overlays/aws, with failure-detection timers tightened for the node-failure test.
-# Compare against overlays/aws (defaults) — see docs/results.md for the trade-offs.
+# Compare against overlays/aws (defaults) — see docs/archive/v1/results.md for the trade-offs.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:

@@ -1,0 +1,4 @@
+  ip daddr @r53v4 counter packets 170 bytes 12240 drop
+  ip6 daddr @r53v6 counter packets 0 bytes 0 drop
+block lifted
+

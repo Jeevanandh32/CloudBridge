@@ -1,0 +1,56 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.10.5",
+  "resource_changes": [
+    {
+      "address": "aws_ec2_transit_gateway_vpc_attachment.inspection",
+      "mode": "managed",
+      "type": "aws_ec2_transit_gateway_vpc_attachment",
+      "name": "inspection",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "id": "tgw-attach-0inspection",
+          "appliance_mode_support": "enable",
+          "dns_support": "enable",
+          "subnet_ids": [
+            "subnet-0tgwa",
+            "subnet-0tgwb"
+          ],
+          "transit_gateway_id": "tgw-0hub",
+          "transit_gateway_default_route_table_association": false,
+          "transit_gateway_default_route_table_propagation": false,
+          "tags": {
+            "Name": "cloudbridge-att-inspection"
+          },
+          "vpc_id": "vpc-0inspection"
+        },
+        "after": {
+          "id": "tgw-attach-0inspection",
+          "appliance_mode_support": "enable",
+          "dns_support": "enable",
+          "subnet_ids": [
+            "subnet-0tgwa",
+            "subnet-0tgwb"
+          ],
+          "transit_gateway_id": "tgw-0hub",
+          "transit_gateway_default_route_table_association": false,
+          "transit_gateway_default_route_table_propagation": false,
+          "tags": {
+            "Name": "cloudbridge-att-inspection",
+            "Owner": "network"
+          },
+          "vpc_id": "vpc-0inspection"
+        },
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": {}
+      }
+    }
+  ],
+  "configuration": {},
+  "planned_values": {}
+}

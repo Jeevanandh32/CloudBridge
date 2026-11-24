@@ -1,0 +1,74 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.10.5",
+  "resource_changes": [
+    {
+      "address": "module.eks.aws_security_group_rule.node[\"vpc\"]",
+      "module_address": "module.eks",
+      "mode": "managed",
+      "type": "aws_security_group_rule",
+      "name": "node",
+      "index": "vpc",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "delete",
+          "create"
+        ],
+        "before": {
+          "security_group_id": "sg-0f1e2d3c4b5a69788",
+          "type": "ingress",
+          "protocol": "-1",
+          "from_port": 0,
+          "to_port": 0,
+          "description": "All traffic from the app spoke VPC",
+          "ipv6_cidr_blocks": null,
+          "prefix_list_ids": null,
+          "self": false,
+          "source_security_group_id": null,
+          "region": "us-east-2",
+          "cidr_blocks": [
+            "10.10.0.0/20"
+          ],
+          "id": "sgrule-1234567890",
+          "security_group_rule_id": "sgr-0a1b2c3d4e5f60718"
+        },
+        "after": {
+          "security_group_id": "sg-0f1e2d3c4b5a69788",
+          "type": "ingress",
+          "protocol": "-1",
+          "from_port": 0,
+          "to_port": 0,
+          "description": "All traffic from the app spoke VPC",
+          "ipv6_cidr_blocks": null,
+          "prefix_list_ids": null,
+          "self": false,
+          "source_security_group_id": null,
+          "region": "us-east-2",
+          "cidr_blocks": [
+            "10.10.0.0/20",
+            "10.10.64.0/18"
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "security_group_rule_id": true,
+          "cidr_blocks": [
+            false,
+            false
+          ]
+        },
+        "before_sensitive": {},
+        "after_sensitive": {}
+      },
+      "action_reason": "replace_because_cannot_update",
+      "replace_paths": [
+        [
+          "cidr_blocks"
+        ]
+      ]
+    }
+  ],
+  "configuration": {},
+  "planned_values": {}
+}

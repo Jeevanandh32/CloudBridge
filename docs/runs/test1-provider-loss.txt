@@ -1,0 +1,14 @@
+test1 provider-loss 2026-11-23T22:50:50Z  resolver: unbound on fw-a, iterator only, caches flushed per query
+columns: q phase i wall_ms status provider r53_servers_tried r53_rto_max_ms azure_servers_tried
+
+normal         ok 20/20  median 120 ms  p90 271 ms  max 332 ms  answered by: azure-dns=5 route53=15  Route 53 servers tried per query: 0.8
+blocked-cold   ok 20/20  median 263 ms  p90 327 ms  max 329 ms  answered by: azure-dns=20  Route 53 servers tried per query: 0.9  (+142 ms vs normal)
+blocked-warm   ok 20/20  median 244 ms  p90 300 ms  max 323 ms  answered by: azure-dns=20  Route 53 servers tried per query: 1.9  (+124 ms vs normal)
+
+nft (Route 53 IPs dropped on OUTPUT):
+  ip daddr @r53v4 counter packets 170 bytes 12240 drop
+  ip6 daddr @r53v6 counter packets 0 bytes 0 drop
+block lifted
+
+
+MindBridge AI predicted for dns-route53: degraded, recovery auto ~3.0 s per lookup (a resolver timeout, then the other provider). Compare with the +ms above.

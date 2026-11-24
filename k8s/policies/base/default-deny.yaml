@@ -1,0 +1,13 @@
+# Test 6 Part A. Standard NetworkPolicy only, so the same files work on EKS (VPC CNI network
+# policy agent, eBPF) and AKS (Cilium). Everything in the cloudbridge namespace is denied in
+# both directions; the other files open only what the app needs.
+# Kubelet probes come from the node itself; both engines allow host -> local pod traffic
+# without a rule (test6 `policy` checks the pods stay Ready after this is applied).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: cloudbridge
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]

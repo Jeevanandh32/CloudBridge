@@ -1,0 +1,101 @@
+== Test 6 Part A: NetworkPolicy, 2026-11-23T21:23:31Z
+cb-probe = a netshoot pod in the cloudbridge namespace (app=probe): no policy allows it anything but DNS
+
+== BEFORE (no policies: everything is allowed)
+-- EKS
+  frontend -> backend:8080                     expect-after: allow    now: ALLOWED            reached 200
+  probe -> backend:8080                        expect-after: block    now: ALLOWED            200
+  probe DNS (CoreDNS)                          expect-after: allow    now: ALLOWED            172.20.206.97
+  probe -> internet https                      expect-after: block    now: ALLOWED            200
+  backend -> frontend:80                       expect-after: block    now: ALLOWED            reached 200
+  frontend -> internet https                   expect-after: block    now: ALLOWED            reached 200
+  internet -> LB -> frontend /health           expect-after: allow    now: ALLOWED            200
+-- AKS
+  frontend -> backend:8080                     expect-after: allow    now: ALLOWED            reached 200
+  probe -> backend:8080                        expect-after: block    now: ALLOWED            200
+  probe DNS (CoreDNS)                          expect-after: allow    now: ALLOWED            172.21.3.111
+  probe -> internet https                      expect-after: block    now: ALLOWED            200
+  backend -> frontend:80                       expect-after: block    now: ALLOWED            reached 200
+  frontend -> internet https                   expect-after: block    now: ALLOWED            reached 200
+  internet -> LB -> frontend /health           expect-after: allow    now: ALLOWED            200
+
+== Applying k8s/policies/aws to EKS and k8s/policies/azure to AKS
+networkpolicy.networking.k8s.io/allow-dns created
+networkpolicy.networking.k8s.io/backend-ingress-from-frontend created
+networkpolicy.networking.k8s.io/default-deny created
+networkpolicy.networking.k8s.io/frontend-egress-to-backend created
+networkpolicy.networking.k8s.io/frontend-ingress-from-lb created
+networkpolicy.networking.k8s.io/allow-dns created
+networkpolicy.networking.k8s.io/backend-ingress-from-frontend created
+networkpolicy.networking.k8s.io/default-deny created
+networkpolicy.networking.k8s.io/frontend-egress-to-backend created
+networkpolicy.networking.k8s.io/frontend-ingress-from-lb created
+waiting 20 s for both engines to program the rules
+
+== AFTER
+-- EKS
+  frontend -> backend:8080                     expect-after: allow    now: ALLOWED            reached 200
+  probe -> backend:8080                        expect-after: block    now: BLOCKED (exit 28)  000command terminated with exit code 28
+  probe DNS (CoreDNS)                          expect-after: allow    now: ALLOWED            172.20.206.97
+  probe -> internet https                      expect-after: block    now: BLOCKED (exit 28)  000command terminated with exit code 28
+  backend -> frontend:80                       expect-after: block    now: BLOCKED (exit 1)   command terminated with exit code 1
+  frontend -> internet https                   expect-after: block    now: BLOCKED (exit 1)   command terminated with exit code 1
+  internet -> LB -> frontend /health           expect-after: allow    now: ALLOWED            200
+-- AKS
+  frontend -> backend:8080                     expect-after: allow    now: ALLOWED            reached 200
+  probe -> backend:8080                        expect-after: block    now: BLOCKED (exit 28)  000command terminated with exit code 28
+  probe DNS (CoreDNS)                          expect-after: allow    now: ALLOWED            172.21.3.111
+  probe -> internet https                      expect-after: block    now: BLOCKED (exit 28)  000command terminated with exit code 28
+  backend -> frontend:80                       expect-after: block    now: BLOCKED (exit 1)   command terminated with exit code 1
+  frontend -> internet https                   expect-after: block    now: BLOCKED (exit 1)   command terminated with exit code 1
+  internet -> LB -> frontend /health           expect-after: allow    now: ALLOWED            200
+
+== Pods still Ready under default-deny (kubelet probes come from the node and are not blocked)
+  eks backend-5dfd4586fc-6px4c 1/1 Running 10.10.65.164
+  eks backend-5dfd4586fc-jsdsj 1/1 Running 10.10.65.161
+  eks backend-5dfd4586fc-w2fkp 1/1 Running 10.10.110.17
+  eks cb-probe 1/1 Running 10.10.65.165
+  eks frontend-65555b75f6-mzkjn 1/1 Running 10.10.110.18
+  eks frontend-65555b75f6-s99bc 1/1 Running 10.10.110.16
+  eks frontend-65555b75f6-xxj96 1/1 Running 10.10.65.163
+  aks backend-57d7cb9467-7fnhv 1/1 Running 10.244.0.221
+  aks backend-57d7cb9467-gl7dg 1/1 Running 10.244.0.222
+  aks backend-57d7cb9467-tlr8n 1/1 Running 10.244.0.249
+  aks cb-probe 1/1 Running 10.244.0.130
+  aks frontend-577894c4c4-75j4x 1/1 Running 10.244.0.103
+  aks frontend-577894c4c4-8vx8q 1/1 Running 10.244.0.236
+  aks frontend-577894c4c4-dwfv8 1/1 Running 10.244.0.156
+
+== Drop evidence, AKS: cilium-dbg monitor --type drop (45 s window)
+   drop events captured: 0
+-- Hubble (only if enabled on this cluster)
+   rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial unix /var/run/cilium/hubble.sock: connect: no such file or directory"
+   command terminated with exit code 1
+   hubble not available (needs Advanced Container Networking Services)
+
+== Drop evidence, EKS: network policy agent flow log (DENY verdicts for the probe and app pods)
+-- node ip-10-10-0-111.us-east-2.compute.internal
+   DENY lines in /npa/network-policy-agent.log: 8
+   {"level":"info","ts":"2026-11-23T21:24:24.868Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.110.16 Src Port: 53436 Dest IP: 172.66.147.243 Dest Port: 443 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:25.900Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.110.16 Src Port: 53436 Dest IP: 172.66.147.243 Dest Port: 443 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:26.950Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.110.16 Src Port: 53436 Dest IP: 172.66.147.243 Dest Port: 443 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:27.979Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.110.16 Src Port: 53436 Dest IP: 172.66.147.243 Dest Port: 443 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:28.870Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.110.16 Src Port: 44364 Dest IP: 104.20.23.154 Dest Port: 443 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:29.899Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.110.16 Src Port: 44364 Dest IP: 104.20.23.154 Dest Port: 443 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:30.939Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.110.16 Src Port: 44364 Dest IP: 104.20.23.154 Dest Port: 443 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:31.979Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.110.16 Src Port: 44364 Dest IP: 104.20.23.154 Dest Port: 443 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+-- node ip-10-10-0-15.us-east-2.compute.internal
+   DENY lines in /npa/network-policy-agent.log: 12
+   {"level":"info","ts":"2026-11-23T21:24:15.308Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.65.165 Src Port: 55006 Dest IP: 104.20.23.154 Dest Port: 443 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:16.332Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.65.165 Src Port: 55006 Dest IP: 104.20.23.154 Dest Port: 443 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:17.306Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.65.165 Src Port: 43270 Dest IP: 172.66.147.243 Dest Port: 443 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:18.332Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.65.165 Src Port: 43270 Dest IP: 172.66.147.243 Dest Port: 443 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:20.072Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.65.161 Src Port: 59740 Dest IP: 172.20.2.229 Dest Port: 80 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:21.132Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.65.161 Src Port: 59740 Dest IP: 172.20.2.229 Dest Port: 80 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:22.182Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.65.161 Src Port: 59740 Dest IP: 172.20.2.229 Dest Port: 80 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+   {"level":"info","ts":"2026-11-23T21:24:23.212Z","caller":"runtime/asm_amd64.s:1264","msg":"Flow Info: Src IP: 10.10.65.161 Src Port: 59740 Dest IP: 172.20.2.229 Dest Port: 80 Proto TCP Verdict DENY Direction egress, Tier NETWORK_POLICY"}
+
+   VPC flow logs will NOT show these: the drop happens in eBPF on the node, after the
+   security group has already accepted the packet.
+
+Policies stay applied. Remove them with: tests/test6-traffic-control.sh policy-off

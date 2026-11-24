@@ -1,28 +1,250 @@
 # CloudBridge
 
-![CloudBridge — multi-cloud failover on AWS and Azure](docs/cover.png)
+![CloudBridge: multi-cloud active-passive network on AWS and Azure, with measured results](docs/cover.png)
 
-▶ **[Watch the 2-minute walkthrough](docs/cloudbridge-demo.mp4)** (with music), also on my [portfolio](https://jeevanandh32.github.io/#cloudbridge).
+▶ **[Watch the 2-minute walkthrough](docs/cloudbridge-demo.mp4)** (with music) · [portfolio](https://jeevanandh32.github.io/#cloudbridge)
 
-Multi-cloud AWS + Azure platform built with Terraform — then tested with injected failures, measured, and
-explained from the routing and DNS layer up. Warm standby: EKS (AWS) primary, AKS (Azure) secondary,
-Route 53 health-checked failover, and a separate IPsec/eBGP VPN between the private networks.
+A multi-cloud, active-passive network across AWS and Azure, built with Terraform, then tested with
+injected failures, measured, and explained from the routing and DNS layer up:
+- **Hub-and-spoke on both clouds:** a Transit Gateway with inspection firewalls on AWS, and a hub
+  VNet with a firewall VM and a peered AKS spoke on Azure.
+- **Private link:** a 4-tunnel active-active IPsec/eBGP VPN between the two hubs.
+- **Kubernetes:** EKS (active) and AKS (passive), with their pod networking tested across the VPN.
+- **DNS on two providers:** Route 53 and Azure DNS with Traffic Manager, so DNS has no single point
+  of failure.
+- **MindBridge AI:** a read-only tool that checks every change before it is applied and warns
+  before failures that build up gradually.
 
-> **Status (2026-10-18):** all tests complete; every cloud layer has been destroyed to stop costs.
-> The code rebuilds everything (~70 min, the Azure VPN gateway is the slow part) — see [Rebuild it](#rebuild-it).
+> **Status (2026-11-23):** complete. All 6 tests ran across 3 sessions, and every layer
+> was destroyed afterwards. The plan is in [`docs/plan.md`](docs/plan.md). v1
+> (2 tunnels, Route 53 only, 14 tests) is at tag
+> [`v1`](https://github.com/Jeevanandh32/CloudBridge/tree/v1), with its tests and raw data in
+> [`docs/archive/v1/`](docs/archive/v1/) and [`tests/archive/v1/`](tests/archive/v1/).
+
+## Results
+
+![CloudBridge: hub-and-spoke on AWS and Azure, two DNS providers, 4-tunnel VPN, MindBridge AI](docs/architecture.png)
+
+
+Six network tests across 3 sessions, about $7 of cloud time in total. Every number is measured;
+raw data and the full write-ups are in [`docs/runs/`](docs/runs/).
+
+| Test | What was broken | Result |
+|---|---|---|
+| [1. DNS with no single point of failure](docs/runs/test1-summary.md) | Every Route 53 name server made unreachable, then the AWS app taken down | **304/304 lookups answered by Azure DNS**; failover to Azure in **36.4 s** with Route 53 gone; failback in 14.5 s with 0 errors |
+| [2. Region loss](docs/runs/test2-summary.md) | AWS app scaled to 0 **and** all 4 VPN tunnels cut | Users on Azure in **41.7 s** (v1: ~102 s); BGP withdrew routes in both clouds in 53 s |
+| [3. Hybrid routing](docs/runs/test3-summary.md) | BGP config break on 1 tunnel; an Azure gateway instance reset | Config break: **0 of 16 flows lost a packet**. Instance reset: 38 % of flows paused 22–31 s, never a full outage; redundancy back after 14 min |
+| [4. Hub-and-spoke firewall](docs/runs/test4-summary.md) | A missing TGW route; TGW appliance mode toggled | The route mistake blackholed all traffic while everything looked healthy, and **MindBridge AI blocked the change in advance**. Re-enabling appliance mode caused ~14 min of asymmetric drops |
+| [5. Pod networking](docs/runs/test5-summary.md) | Pod IP exhaustion, then cross-cloud pod reachability | The ENI limit and then **/28 fragmentation stalled a node rollout** with IPs still free; custom networking took pods **18 → 204**. Routable vs overlay pod IPs and their SNAT behaviour proven with tcpdump |
+| [6. Kubernetes traffic control](docs/runs/test6-summary.md) | Default-deny NetworkPolicy; egress lockdown; inbound DNAT | Policy **14/14**; the Azure FQDN allowlist blocked Docker Hub on 443; AWS port rules **still let any site out on 443**; the inbound path was fixed with SNAT |
+
+**MindBridge AI** ([`tools/mindbridge/`](tools/mindbridge/)) checks every `terraform plan`
+before it is applied, runs a what-if sweep of single-component failures, and watches warning
+signs. Every prediction was compared with the measurement, and the model was corrected from the
+data. Most of its first guesses were wrong in useful ways:
+- It treated a clean BGP failure like a silent one.
+- It didn't model the 14-minute reduced-redundancy window.
+- It assumed appliance mode matters for VPN traffic.
+- It watched free IPs instead of free /28 blocks.
+- Its first loss probe was too coarse to see a slow ramp.
+
+Calibration tables: [`tools/mindbridge/README.md`](tools/mindbridge/README.md).
+
+**Early warning, measured live:** a packet-loss ramp was injected on the cross-cloud path, and
+MindBridge AI warned **9–14 minutes before loss crossed 5 %, with 0 false alarms**
+([write-up](docs/runs/slowburn2-summary.md)). In Session 1, with a coarser probe, the same ramp
+went unpredicted.
 
 ## Architecture
 
-![CloudBridge architecture with AWS and Azure service icons](docs/architecture.png)
+- **North-south (users):** `app.jeevs.click` is delegated to **2 Route 53 + 2 Azure DNS** name
+  servers, and both providers answer:
+  - **Route 53:** failover records with health checks.
+  - **Azure DNS:** a CNAME to a **Traffic Manager** priority profile.
+  - **Where users land:** the AWS ALB while its deep `/health` check passes; otherwise the Azure
+    firewall's public IP, which DNATs to the AKS internal load balancer. If either DNS provider is
+    unreachable, resolvers use the other one.
+- **AWS hub and spoke:** the app spoke VPC sends all egress (internet and Azure) to the **Transit
+  Gateway**. The Transit Gateway passes it through the **inspection VPC**: 2 Linux firewalls,
+  1 per AZ, running stateful nftables with NAT, an MSS clamp and DNS forwarding. Users enter
+  through the ALB in the spoke.
+- **Azure hub and spoke:** the AKS spoke is peered to the hub with gateway transit, and a
+  `0.0.0.0/0` UDR forces all traffic through the hub firewall VM. AKS has no public IP of its own:
+  the student quota of 3 is used by the 2 VPN gateway instances and the firewall.
+- **East-west (private):** **2 AWS VPN connections × 2 tunnels** go to an **active-active** Azure
+  VPN gateway, with eBGP 64512 ↔ 65515 and ECMP in both directions.
+  - **Pod addressing:** EKS pods have routable VPC IPs, and with custom networking they get their
+    own /19s. AKS pods use an overlay range and are SNATed to the node IP.
+  - **Private DNS:** each side's firewall forwards DNS for the other side's private zones.
+- **Separate failure domains:** user failover never depends on the VPN. Test 2 cut the app and all
+  4 tunnels together, and users were on Azure in 41.7 s.
 
-- **North-south (users):** `app.jeevs.click` resolves through **Route 53**, which answers with the AWS ALB
-  (PRIMARY) while its deep `/health` check passes, otherwise with the Azure Standard LB (SECONDARY).
-- **East-west (private):** two **IPsec IKEv2 tunnels with eBGP** (AWS ASN 64512 ↔ Azure 65515) join
-  `10.10.0.0/16` and `10.20.0.0/16`; pods in both clouds have routable IPs (VPC CNI / Azure CNI).
-- **Separate failure domains:** failover never uses the VPN, so losing a whole region — tunnels
-  included — doesn't block it (measured in Test 5).
+## Design decisions
 
-## Key findings
+| Decision | Why |
+|---|---|
+| **Active-passive, with Azure always running** | Failover must not need instance launches or control-plane calls. Azure took over in every test with nothing to start. |
+| **DNS on two providers** (Route 53 + Azure DNS / Traffic Manager) | Removes DNS as a single point of failure. Measured: with Route 53 unreachable, 304/304 lookups answered and failover in 36.4 s. |
+| **Linux VMs as firewalls** instead of AWS Network Firewall / Azure Firewall | About $0.01/hr per firewall instead of about $0.40–1.25/hr, and the routing design is the same. Production upgrade point: above about 1 Gbps or for managed IDS. |
+| **Transit Gateway with only the attachments the tests need** | Each attachment costs $0.05/hr, so 4 attachments, not one per hypothetical spoke. |
+| **Active-active Azure VPN gateway, 4 tunnels, ECMP** | Losing one instance costs half the tunnels, not the link. Measured: 22–31 s pause on 38 % of flows, never a full outage. |
+| **Appliance mode set at build time and left alone** | Toggling it on live traffic caused about 14 min of asymmetric drops (Test 4). |
+| **Inbound DNAT plus SNAT on the Azure firewall** | The AKS node NSG only admits VNet sources, and the internal LB rewrites the destination. SNAT makes the flow symmetric through one stateful device, which is how Azure Firewall DNAT works too. |
+| **EKS custom networking with secondary-CIDR pod subnets** | Prefix delegation in /26 node subnets failed from /28 fragmentation while IPs were still free. Custom networking took pods from 18 to 204. |
+| **AKS Azure CNI Overlay + Cilium, outbound through the firewall** | Saves VNet IPs and gives NetworkPolicy. It also shows the overlay vs routable pod model across the VPN. |
+| **Spot nodes, Free AKS tier, smallest viable sizes** | About $0.80/hr with everything up, and each session was destroyed afterwards. |
+| **MindBridge AI is read-only, and checks plans before apply** | It warns and blocks, and a human applies every fix. Its models were corrected from every measured test. |
+| **Layered Terraform with remote state** | Each layer reads others only through `terraform_remote_state` outputs, so there are no hand-copied IDs. Each test applies only the layers it needs. |
+| **AWS in us-east-2; Azure in northcentralus** | This avoids us-east-1. The Azure for Students policy allows only 5 regions, and northcentralus is the closest to Ohio. |
+
+## Services and cost
+
+![CloudBridge services in AWS and Azure, with approximate hourly cost: about $0.80/hr with everything up](docs/services-dashboard.svg)
+
+Generated by [`docs/services_dashboard.py`](docs/services_dashboard.py). All the tests together cost about $7.
+
+## Tech stack
+
+| Area | Tools |
+|---|---|
+| Infrastructure as code | Terraform ≥ 1.17 (aws ~> 6.0, azurerm ~> 4.0), registry module `eks`, S3 backend with native locking |
+| AWS networking | Transit Gateway (3 route tables, ECMP), inspection VPC, Site-to-Site VPN ×2, ALB, S3 gateway + interface endpoints, Route 53 (public + private), VPC Flow Logs |
+| Azure networking | Hub-and-spoke VNets with peering, active-active VPN Gateway (VpnGw1AZ), UDRs, internal Standard LB, Private Endpoint, Private DNS, Azure DNS, Traffic Manager, VNet flow logs |
+| Firewalls | Ubuntu 24.04 with nftables (stateful filtering, NAT/DNAT/SNAT, MSS clamp) and dnsmasq (hybrid DNS forwarding, nftset FQDN allowlists) |
+| Routing | IPsec IKEv2, eBGP (64512 ↔ 65515), ECMP |
+| Kubernetes | EKS 1.35 (VPC CNI with NetworkPolicy, prefix delegation, custom networking; Spot node group; Pod Identity) · AKS 1.35 (Azure CNI Overlay + Cilium) · Kustomize · Helm (AWS Load Balancer Controller) |
+| App | Python FastAPI + httpx, Docker (linux/amd64), ECR, ACR |
+| Observability | CloudWatch alarms + SNS, Azure Monitor alerts, Route 53 and Traffic Manager health checks, flow logs |
+| MindBridge AI | Python (stdlib + PyYAML + python-hcl2), SQLite signal store, the Anthropic API for optional explanations |
+| Testing | Bash + Python, unbound, iperf3, tcpdump, conntrack, tc netem, netshoot |
+
+## Repository layout
+
+| Path | What it is |
+|---|---|
+| `terraform/bootstrap/` | S3 state bucket (local state, apply once) |
+| `terraform/aws/hub/` | Transit Gateway + 3 route tables, inspection VPC, firewalls fw-a/fw-b, flow logs |
+| `terraform/aws/spoke-app/` | App VPC, TGW attachment, ALB subnets, S3 endpoints, private zone, optional secondary CIDR and test hosts |
+| `terraform/aws/eks/` | EKS, Spot node group, VPC CNI (NetworkPolicy, prefix delegation, custom networking), CoreDNS forwarding, ECR, LB Controller role |
+| `terraform/azure/hub/` | Resource group, hub VNet, **active-active VPN gateway (about 25 min to build)**, firewall VM, private DNS zones, storage, flow logs |
+| `terraform/azure/spoke-aks/` | AKS spoke VNet, peering, UDRs, Private Endpoint, flow logs |
+| `terraform/azure/aks/` | AKS (Overlay + Cilium, outbound through the firewall), ACR, identities |
+| `terraform/connectivity/vpn/` | 2 customer gateways, 2 VPN connections on the TGW, 4 local network gateways + connections, BGP, VPN alarms |
+| `terraform/global/dns/` | Route 53 failover + health checks, Azure DNS zone + Traffic Manager, apex NS on both, registrar delegation |
+| `terraform/ops/` | Budgets in both clouds |
+| `app/` | FastAPI app: one image, `ROLE=frontend` or `backend` |
+| `k8s/` | Kustomize overlays (`aws`, `azure`), NetworkPolicies, ENIConfigs, CoreDNS config, `deploy.sh` |
+| `tests/` | One script per test, plus `inventory.sh` (`tests/archive/v1/` has the v1 scripts) |
+| `tools/mindbridge/` | MindBridge AI: precheck, what-if, watch/predict/replay, explain (118 tests) |
+| `docs/` | Plan, runbooks, results (`runs/`), diagrams as code (`architecture.py`, `cover.py`, `services_dashboard.py`), v1 archive (`archive/v1/`) |
+
+## Rebuild it
+
+The step-by-step runbooks cover the checks for each layer:
+- [Session 1](docs/session1-runbook.md): networks, firewalls, VPN; Tests 3–4.
+- [Session 2](docs/session2-runbook.md): clusters; Tests 5–6.
+- [Session 3](docs/session3-runbook.md): DNS; Tests 1–2.
+
+Alarm procedures are in [`docs/runbook.md`](docs/runbook.md).
+
+### Prerequisites
+- **Tools:** Terraform ≥ 1.17, AWS CLI, Azure CLI, kubectl, Helm, Docker, jq.
+- **AWS:** `aws configure`, as an IAM user with MFA, region `us-east-2`.
+- **Azure:** `az login`, then `export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)`.
+- **Domain:** a domain registered in Route 53 Domains, with its hosted zone already created
+  (default `jeevs.click`).
+- **Git-ignored config:**
+  - `terraform/backend.hcl`;
+  - `alert_email` in `connectivity/vpn` and `ops`;
+  - `admin_cidrs = ["<your-ip>/32"]` in `aws/eks` and `azure/aks`.
+
+### Order
+Run each layer with `terraform init -backend-config=../../backend.hcl`, then `terraform plan -out=layer.tfplan`, then `caffeinate -i terraform apply layer.tfplan`. For `ops`, use `../backend.hcl`.
+```
+azure/hub (start first, ~25 min) ─┐
+aws/hub → aws/spoke-app → aws/eks │
+                                  └→ azure/spoke-aks → connectivity/vpn → azure/aks → ops
+then: LB Controller (Helm) → k8s/deploy.sh → global/dns
+```
+Before any apply during a test session, run MindBridge AI's pre-change check on the plan:
+```bash
+terraform show -json layer.tfplan > /tmp/plan.json && (cd tools && python -m mindbridge precheck /tmp/plan.json)
+```
+
+### Verify
+```bash
+tests/test3-hybrid-routing.sh check     # tunnels, BGP, ping/HTTP across the VPN, DNS both ways
+tests/test1-dns-no-spof.sh check        # both DNS providers answer app.jeevs.click
+curl -s http://app.jeevs.click/health   # {"status":"ok","cloud":"aws"}
+```
+
+## Run the tests
+
+| Test | Command | What it breaks |
+|---|---|---|
+| 1. DNS, no single point of failure | `tests/test1-dns-no-spof.sh provider-loss`, then `failover-without-route53` | Drops every Route 53 name server on a test resolver, then scales the AWS app to 0 |
+| 2. Region loss | `tests/test2-region-loss.sh break`, then `restore` | AWS app to 0 + wrong PSKs on all 4 connections (restore is the Terraform drift fix) |
+| 3. Hybrid routing | `tests/test3-hybrid-routing.sh paths`, `bgp-break`, `instance-down`, `mtu` | Wrong peer ASN on one tunnel; reset of one Azure gateway instance |
+| 4. Hub firewall | `tests/test4-hub-firewall.sh baseline`, `break-a`, `break-b` | Removes the spoke's TGW propagation; toggles appliance mode |
+| 5. Pod networking | `tests/test5-pod-networking.sh capacity`, `prefix`, `custom`, `xcloud`, `private` | Scales pods to the IP limits; switches IP modes; cross-cloud pod reachability |
+| 6. Traffic control | `tests/test6-traffic-control.sh policy`, `egress-azure`, `egress-aws`, `inbound-asym` | Default-deny NetworkPolicy; egress lockdown on the firewalls |
+
+Every script restores what it broke on exit, or prints the exact Terraform command that does.
+MindBridge AI:
+```bash
+cd tools
+python -m mindbridge whatif                      # single-component failure sweep -> docs/mindbridge/whatif-report.md
+python -m mindbridge watch --interval 60         # read-only collectors -> local SQLite
+python -m mindbridge predict --since 30m         # early warnings with impact
+python -m mindbridge replay <series.csv>         # score lead time and false alarms
+```
+
+## Tear down
+
+```bash
+cd terraform/global/dns && terraform destroy          # first: it reads the ALB
+~/cloudbridge-restore-ns.sh                            # put the 4 Route 53 name servers back (saved after the DNS apply)
+kubectl --context cloudbridge-eks -n cloudbridge delete ingress frontend   # the controller deletes the ALB
+kubectl --context cloudbridge-aks -n cloudbridge delete svc frontend       # AKS deletes the internal LB
+# then: aws/eks + azure/aks -> connectivity/vpn -> azure/spoke-aks + aws/spoke-app -> aws/hub + azure/hub
+tests/inventory.sh                                     # must end with CLEAN
+```
+Keep `bootstrap` (the state bucket costs cents) and `ops` (the budgets are free).
+
+**If an Azure destroy fails:** `AnotherOperationInProgress` (409) is Azure allowing only one
+operation at a time on a VNet. Re-run the destroy with `-parallelism=1`, and destroy the spoke
+before the hub.
+
+## Known limitations and next steps
+
+- **The Azure firewall is a single VM.** Its failure stops Azure ingress, AKS egress and Azure-side
+  DNS. A second VM behind an internal LB needs a 4th public IP, which the student quota doesn't
+  allow. MindBridge AI ranks this as risk #1.
+- **AWS firewalls are pinned per AZ.** The TGW subnet routes point at one firewall's network
+  interface, so losing fw-a degrades the AZ-a half until someone fixes it by hand. The production
+  answer is Gateway Load Balancer or AWS Network Firewall.
+- **The ALB's own name is served by Route 53.** In a total Route 53 outage, a healthy AWS side
+  still can't be resolved, so Azure DNS effectively sends everyone to Azure.
+- **The textbook appliance-mode failure wasn't reproduced.** It needs VPC-to-VPC traffic across
+  AZs, which means a second spoke VPC, about +$0.05/hr.
+- **Single AKS node.** This is set by the regional vCPU quota.
+- **Small samples.** Most tests ran once or twice in a lab, and MindBridge AI's thresholds were
+  calibrated on those runs.
+- **Unexplained, to follow up:**
+  - AWS → Azure TCP MSS arrived at 1170, lower than expected.
+  - Cilium's drop monitor caught no events, although the policy blocks worked.
+
+## v1 (archived)
+
+v1 had 2 tunnels on a VGW, a single VNet, Route 53 as the only DNS provider, and 14 tests,
+including node failure and ALB errors. Its code is at tag
+[`v1`](https://github.com/Jeevanandh32/CloudBridge/tree/v1). Its results:
+[`docs/archive/v1/results.md`](docs/archive/v1/results.md), raw runs in
+[`docs/archive/v1/runs/`](docs/archive/v1/runs/), runbook in
+[`docs/archive/v1/runbook.md`](docs/archive/v1/runbook.md), IP plan in
+[`docs/archive/v1/ip-plan.md`](docs/archive/v1/ip-plan.md).
+
+### v1 key findings
 
 | Failure injected | What I measured | What I learned |
 |---|---|---|
@@ -33,10 +255,10 @@ Route 53 health-checked failover, and a separate IPsec/eBGP VPN between the priv
 | **BGP on the active tunnel** (IPsec up) | **0.8 s longest ping-reply gap; 9 unanswered probes** at 5 probes/s | The test observed a short traffic interruption during path change. This is not a measurement of BGP detection or tunnel-rebuild time. |
 | **MTU / route propagation / NACL / ALB / pod IPs** | Path MTU 1422, MSS clamped 1310/1360 · green dashboard + blackholed traffic · one-way NACL failure · 502/503/504 decoded · 17 pods per t3.medium | Break/fix lab: each fault hides behind a healthy-looking layer. |
 
-Every run, number, and raw CSV: [`docs/results.md`](docs/results.md) and [`docs/runs/`](docs/runs/).
-Alarms and recovery procedures: [`docs/runbook.md`](docs/runbook.md).
+Every run, number, and raw CSV: [`docs/archive/v1/results.md`](docs/archive/v1/results.md) and [`docs/archive/v1/runs/`](docs/archive/v1/runs/).
+Alarms and recovery procedures: [`docs/archive/v1/runbook.md`](docs/archive/v1/runbook.md).
 
-### Measurement boundaries
+#### v1 measurement boundaries
 
 - These are controlled lab measurements. HTTP failover is timed from fault injection to the first successful response from the standby, using approximately one request per second.
 - The **77–107 s** application-failover range comes from three app-loss runs. DNS-dependency failures took **62–145 s**; the results do not establish a universal under-two-minute recovery guarantee.
@@ -44,153 +266,3 @@ Alarms and recovery procedures: [`docs/runbook.md`](docs/runbook.md).
 - MTU tests measured **1422 bytes AWS → Azure** and **1420 bytes Azure → AWS**. Packet captures observed gateway MSS clamping to **1310/1360**; this project did not configure a manual MSS adjustment.
 - The regional-loss scenarios disable the application and, in Test 5, its private VPN. They do not reproduce every failure mode of an actual cloud-provider regional outage.
 - The node-failure comparison uses one completed default run and two tuned runs: the mean last-error time fell from **88.7 s to 56.8 s**. The **36%** figure refers to this recovery-time measure; failed-request counts fell from 26 to 18 (**31%**).
-
-## Design decisions
-
-| Decision | Why |
-|---|---|
-| **Warm standby** in Azure (always running) | Lesson from Oct 2025: failover must not need launches or control-plane calls. Azure took over in every test with nothing to start. |
-| **Deep `/health` for Route 53 and readiness; shallow `/live` for liveness and LB checks** | A broken dependency should move traffic, not restart healthy frontends. |
-| **Route 53 data plane only** for failover | Health checks and DNS answers are global; record edits (control plane) live in us-east-1. |
-| **One image registry per cloud** (ECR, ACR) | No cross-cloud pull dependency during an incident. |
-| **BGP over two tunnels** instead of static routes | Route withdrawal and an alternate path; the recorded active-peer failure test had a 0.8 s maximum ping-reply gap. |
-| **AWS in us-east-2**, not us-east-1 | Avoid the region (and hidden dependencies) that failed in Oct 2025. |
-| **Azure in northcentralus**, VpnGw1AZ | The Azure for Students policy allows only 5 regions; non-AZ VPN SKUs can no longer be created, AZ SKUs run regional in a no-zone region. |
-| **Smallest viable sizes**, single NAT, Free AKS tier | Cost: ≈ $0.65/hr with everything up; budgets alert at $20 / $30 / $50 in both clouds. |
-| **Layered Terraform with remote state** | Each layer reads others only through `terraform_remote_state` outputs; no hand-copied IDs. |
-
-## Services and cost
-
-![CloudBridge services in AWS and Azure](docs/services-dashboard.svg)
-
-## Tech stack
-
-| Area | Tools |
-|---|---|
-| Infrastructure as code | Terraform ≥ 1.10 (aws ~> 6.0, azurerm ~> 4.0), registry modules `vpc` / `eks` / `eks-pod-identity`, S3 backend with native locking |
-| Networking | AWS VPC, NAT, VGW, Site-to-Site VPN · Azure VNet, VPN Gateway, local network gateways · IPsec IKEv2, eBGP, Route 53 (public + private zones) |
-| Kubernetes | EKS 1.35 (VPC CNI, managed node group, Pod Identity) · AKS 1.35 (Azure CNI pod subnet) · Kustomize · Helm (AWS Load Balancer Controller) |
-| Load balancing | ALB (IP targets), internal NLB, Azure Standard LB |
-| App | Python FastAPI + httpx, Docker (linux/amd64), ECR, ACR |
-| Observability | CloudWatch alarms + SNS, Azure Monitor metric alerts, Route 53 health checks, VPC Reachability Analyzer |
-| Testing | Bash + Python probes and analysers, netshoot (ping, iperf3, tcpdump, tracepath) |
-
-## Repository layout
-
-| Path | What it is |
-|---|---|
-| `terraform/bootstrap/` | S3 state bucket (local state, apply once) |
-| `terraform/azure/network/` | Resource group, VNet, 4 subnets, **VPN gateway (30–45 min to build)** → `azure/network.tfstate` |
-| `terraform/aws/network/` | VPC, subnets, single NAT, VGW with route propagation → `aws/network.tfstate` |
-| `terraform/connectivity/vpn/` | Customer gateway, VPN (2 tunnels), Azure local gateways + connections, BGP, **VPN alarms** → `connectivity/vpn.tfstate` |
-| `terraform/aws/eks/` | EKS, node group, ECR, LB Controller IAM (Pod Identity), private zone `cloudbridge.internal` → `aws/eks.tfstate` |
-| `terraform/azure/aks/` | AKS, ACR, static frontend IP, role assignments → `azure/aks.tfstate` |
-| `terraform/global/dns/` | Route 53 health checks + PRIMARY/SECONDARY failover records → `global/dns.tfstate` |
-| `app/` | FastAPI app: one image, `ROLE=frontend` or `backend`; fault endpoints only with `ENABLE_FAULTS=true` |
-| `k8s/` | Kustomize base + overlays `aws`, `aws-tuned`, `azure`; `deploy.sh` fills in the registry from Terraform outputs |
-| `tests/` | Probe, analysers, and one script per test (see [Run the tests](#run-the-tests)) |
-| `docs/` | IP plan, results, runbook, diagrams (`architecture.py` is diagrams-as-code), raw run data |
-
-Each Terraform layer is a single `main.tf` grouped by component (variables, resources, and outputs
-together). Layers find the state bucket by name (`cloudbridge-tfstate-<aws-account-id>`).
-All address ranges and ASNs: [`docs/ip-plan.md`](docs/ip-plan.md).
-
-## Rebuild it
-
-### Prerequisites
-- Terraform ≥ 1.10, AWS CLI, Azure CLI, kubectl, Helm, Docker
-- `aws configure` (IAM user with MFA, region `us-east-2`)
-- `az login`, then `export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)`
-- A Route 53 domain (set `domain` in `terraform/global/dns`; default `jeevs.click`)
-- Budget alerts in both clouds
-
-### 1. State bucket
-```bash
-cd terraform/bootstrap && terraform init && terraform apply
-cp ../backend.hcl.example ../backend.hcl                        # put your AWS account ID in the bucket name
-cp ../connectivity/vpn/terraform.tfvars.example ../connectivity/vpn/terraform.tfvars   # alarm email
-```
-
-### 2. Infrastructure layers
-Same pattern for every layer (`caffeinate -i` keeps a Mac awake — if it sleeps, the state upload fails):
-```bash
-cd terraform/<layer>
-terraform init -backend-config=../../backend.hcl
-terraform plan -out=layer.tfplan
-caffeinate -i terraform apply layer.tfplan
-```
-Order: `azure/network` (start first) → `aws/network` → `connectivity/vpn` → `aws/eks` + `azure/aks`.
-
-### 3. App
-```bash
-# image, pushed to both registries (registry names from Terraform outputs)
-docker build --platform linux/amd64 -t cloudbridge-app:v1 app/
-ECR=$(terraform -chdir=terraform/aws/eks output -raw ecr_repository_url)
-ACR=$(terraform -chdir=terraform/azure/aks output -raw acr_login_server)
-aws ecr get-login-password | docker login --username AWS --password-stdin ${ECR%%/*}
-az acr login -n ${ACR%%.*}
-docker tag cloudbridge-app:v1 $ECR:v1 && docker push $ECR:v1
-docker tag cloudbridge-app:v1 $ACR/cloudbridge-app:v1 && docker push $ACR/cloudbridge-app:v1
-
-# kubeconfig, LB Controller, app
-aws eks update-kubeconfig --region us-east-2 --name cloudbridge-eks --alias cloudbridge-eks
-az aks get-credentials -g cloudbridge-rg -n cloudbridge-aks
-helm repo add eks https://aws.github.io/eks-charts
-helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller --version 3.6.0 \
-  -n kube-system --kube-context cloudbridge-eks --set clusterName=cloudbridge-eks \
-  --set serviceAccount.create=true --set serviceAccount.name=aws-load-balancer-controller \
-  --set region=us-east-2 --set vpcId=$(terraform -chdir=terraform/aws/eks output -raw vpc_id)
-k8s/deploy.sh aws && k8s/deploy.sh azure
-tests/backend-dns.sh set          # backend.cloudbridge.internal -> internal NLB
-```
-
-### 4. Global DNS
-Apply `terraform/global/dns` (it finds the ALB by its controller tags and the Azure IP from AKS state).
-
-### Verify
-```bash
-curl -s http://app.jeevs.click/                       # "cloud":"aws"
-aws ec2 describe-vpn-connections --query "VpnConnections[].VgwTelemetry[].[OutsideIpAddress,Status]" --output table
-az network vnet-gateway list-bgp-peer-status -g cloudbridge-rg -n cloudbridge-vpngw -o table
-```
-
-## Run the tests
-
-| Test | Command | What it breaks |
-|---|---|---|
-| 1. DNS outage | `tests/test1-dns-outage.sh <run>` | Deletes `backend.cloudbridge.internal` |
-| 2. Simulated app loss | `tests/test2-region-loss.sh <run>` | Scales the AWS app to 0 |
-| 3. Node failure | `tests/test3-node-failure.sh default-1` (then `k8s/deploy.sh aws-tuned`, `... tuned-1`) | Terminates an EKS worker |
-| 4. B1 BGP down | `tests/test4-b1-bgp-down.sh` | Wrong peer ASN on the active tunnel |
-| 4. B2 MTU/MSS | `tests/test4-b2-mtu.sh` | Measurement only |
-| 4. B3 Route propagation | `tests/test4-b3-route-propagation.sh` | Disables VGW route propagation |
-| 4. B4 NACL | `tests/test4-b4-nacl.sh` | Denies ephemeral ports from Azure |
-| 4. B5 ALB errors | `tests/test4-b5-lb-errors.sh` | Fault endpoints + 5 s idle timeout |
-| 4. B6 Pod IPs | `tests/test4-b6-pod-ips.sh` | Scales the backend to 30 |
-| 5. C2 Simulated app + VPN loss | `tests/test5-c2-region-vpn.sh break`, then `terraform apply` in `connectivity/vpn`, then `... restore` | App to 0 + wrong PSKs |
-
-Every script restores what it broke on exit (C2's restore is the Terraform drift fix, by design).
-
-## Tear down
-
-Destroy in reverse, and remove controller-created load balancers **before** the clusters:
-```bash
-cd terraform/global/dns && terraform destroy                     # first: it looks up the ALB
-kubectl --context cloudbridge-eks delete namespace cloudbridge   # controller deletes ALB + NLB
-kubectl --context cloudbridge-aks delete namespace cloudbridge   # AKS removes its LB rule
-helm --kube-context cloudbridge-eks uninstall aws-load-balancer-controller -n kube-system
-# then: aws/eks + azure/aks -> connectivity/vpn -> aws/network + azure/network
-# keep bootstrap (the state bucket costs cents)
-```
-
-## Known limitations and next steps
-
-- **Client-side failover tail (~1–2 min):** bounded by resolver caching of the ALB alias's 60 s TTL;
-  anycast (AWS Global Accelerator) would remove it.
-- **Node-failure tail (~55 s, tuned):** longer than the ALB timers explain — next: pod readiness
-  gates and ALB access logs.
-- **NACL partial enforcement (B4):** about half of new connections passed an ephemeral-port deny;
-  next: VPC Flow Logs.
-- **Not yet tested:** a NotReady-but-present node (kubelet stop, where the 300 s → 30 s toleration
-  matters), failures on the Azure side, and a full rebuild from scratch with the final code.
-- **Single NAT gateway and active-standby Azure VPN gateway** are cost choices, not HA choices.

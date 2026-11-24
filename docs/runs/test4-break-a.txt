@@ -1,0 +1,4 @@
+label=break-a start_ms=1795456601852 end_ms=1795456634067 base_port=20000
+10.10.0.10   29/200 ok  (14.5%)   curl exit codes: 0=29 28=171
+10.10.0.74   39/200 ok  (19.5%)   curl exit codes: 0=39 28=161
+(exit 0 = ok, 28 = timeout, 7 = refused, 45 = local port busy)

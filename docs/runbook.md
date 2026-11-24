@@ -1,32 +1,36 @@
 # CloudBridge runbook
 
-What to do when an alarm fires or the app fails over. Each section: **what it means → impact →
-check → fix → confirm**. Commands assume `cd terraform/<layer>` and, for Azure,
+What to do when an alarm fires. Each section covers what it means, the impact, the check, the
+fix, and how to confirm. Commands assume `cd terraform/<layer>` and, for Azure,
 `export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)`.
+The v1 runbook is archived in [archive/v1/runbook.md](archive/v1/runbook.md).
 
-| Alarm / event | Fires when | User impact | Section |
+| Alarm | Fires when | User impact | Section |
 |---|---|---|---|
-| `cloudbridge-vpn-degraded` (CloudWatch) | 1 of 2 tunnels (or its BGP) down, 5 min | None — traffic on the other tunnel | [VPN degraded](#vpn-degraded) |
-| `cloudbridge-vpn-down` (CloudWatch) | Both tunnels down, or no metrics | None for public traffic; **no private AWS↔Azure path** | [VPN down](#vpn-down) |
-| `cloudbridge-bgp-peer-down` (Azure Monitor) | A BGP peer on the Azure gateway not connected | Same as above, seen from Azure | [BGP peer down](#bgp-peer-down) |
-| Route 53 AWS health check unhealthy | AWS `/health` failing 3 × 10 s | ~1–2 min of errors, then served by Azure | [App failover](#app-failover-aws--azure) |
+| `cloudbridge-vpn-c0-degraded` / `-c1-degraded` (CloudWatch) | 1 tunnel (or its BGP) down on that connection | None: ECMP carries traffic on the other 3 | [VPN degraded](#vpn-degraded) |
+| `cloudbridge-vpn-c0-down` / `-c1-down` (CloudWatch) | Both tunnels on one connection down, which means one Azure gateway instance is unreachable | None: the other instance's 2 tunnels carry traffic | [VPN down](#vpn-down) |
+| `cloudbridge-vpn-link-down` (CloudWatch) | All 4 tunnels down, or no metrics | **No private AWS↔Azure path.** Public traffic is unaffected. | [VPN down](#vpn-down) |
+| `cloudbridge-bgp-peer-down` (Azure Monitor) | A BGP peer on the Azure gateway not connected for 5 min | Same as above, seen from Azure | [BGP peer down](#bgp-peer-down) |
+| Route 53 AWS health check unhealthy / Traffic Manager `aws-alb` Degraded | AWS `/health` failing 3 × 10 s | ~36–42 s of errors, then served by Azure | [App failover](#app-failover-aws--azure) |
+| A DNS provider unreachable | Resolvers can't reach Route 53 or Azure DNS | About +140 ms per lookup; answers continue | [DNS provider unreachable](#dns-provider-unreachable) |
 
-Why the VPN alarms don't touch user traffic: users reach each cloud's public load balancer over the
-internet and Route 53 picks the healthy one. The VPN is only the private east-west path, so it is a
-separate failure domain from failover.
+The VPN is the private east-west path only. Users reach each cloud through its public entry point
+(the AWS ALB, or the Azure firewall's public IP), so a VPN fault is a separate failure domain from
+app failover.
 
 ---
 
 ## VPN degraded
 
-**Means:** one tunnel is down or its BGP session isn't established. AWS reports a BGP VPN tunnel as
+**Means:** one tunnel is down or its BGP session isn't established. AWS reports a BGP tunnel as
 `DOWN` whenever BGP is down, even if IPsec is up.
-**Impact:** none expected — BGP withdrew that path and traffic uses the other tunnel. Redundancy is gone.
+**Impact:** none expected. BGP withdraws that path, and the Transit Gateway and the Azure
+gateway spread traffic over the remaining tunnels (ECMP). One layer of redundancy is gone.
 
 **Check**
 ```bash
-aws ec2 describe-vpn-connections \
-  --query "VpnConnections[].VgwTelemetry[].[OutsideIpAddress,Status,StatusMessage,AcceptedRouteCount]" --output table
+aws ec2 describe-vpn-connections --filters Name=tag:Project,Values=cloudbridge \
+  --query "VpnConnections[].{id:VpnConnectionId,t:VgwTelemetry[].[OutsideIpAddress,Status,AcceptedRouteCount]}" --output json
 az network vpn-connection list -g cloudbridge-rg --query "[].{name:name,status:connectionStatus}" -o table
 az network vnet-gateway list-bgp-peer-status -g cloudbridge-rg -n cloudbridge-vpngw -o table
 ```
@@ -34,92 +38,77 @@ az network vnet-gateway list-bgp-peer-status -g cloudbridge-rg -n cloudbridge-vp
 | What you see | Layer | Likely cause |
 |---|---|---|
 | AWS `DOWN`, Azure connection `NotConnected` | IPsec / IKE | AWS endpoint maintenance (common, self-heals), PSK or IKE proposal mismatch |
-| Azure connection `Connected`, BGP peer not `Connected` | BGP | Wrong ASN / peer IP / APIPA address (drift), BGP stuck |
-| AWS status message mentions maintenance | AWS-side | Planned tunnel replacement — wait it out |
+| Azure connection `Connected`, BGP peer not `Connected` | BGP | Wrong ASN, peer IP or APIPA address (drift) |
+| AWS status message mentions maintenance | AWS side | Planned tunnel replacement: wait it out |
 
 **Fix (least disruptive first)**
-1. If AWS shows maintenance: wait ~10 min; it usually recovers on its own.
-2. Check for drift (someone edited an ASN, IP, or PSK by hand) and put the code's values back:
-   ```bash
-   cd terraform/connectivity/vpn && terraform plan     # any change listed = drift
-   terraform apply                                       # (user runs apply)
-   ```
-3. Reset the Azure side of the affected connection (re-runs IKE for that tunnel only):
-   ```bash
-   az network vpn-connection reset -g cloudbridge-rg -n cloudbridge-conn-aws-t1   # or -t2
-   ```
-4. Replace the AWS tunnel endpoint (new endpoint, same config):
-   ```bash
-   aws ec2 replace-vpn-tunnel --vpn-connection-id <vpn-id> --vpn-tunnel-outside-ip-address <tunnel-ip>
-   ```
+1. AWS shows maintenance: wait about 10 min.
+2. Drift: `cd terraform/connectivity/vpn && terraform plan`. Any change listed is drift, and
+   `terraform apply` (you run it) puts the code's values back.
+3. Reset the Azure side of one connection:
+   `az network vpn-connection reset -g cloudbridge-rg -n cloudbridge-conn-aws-c0-t1` (or the affected one).
+4. Replace the AWS tunnel endpoint:
+   `aws ec2 replace-vpn-tunnel --vpn-connection-id <id> --vpn-tunnel-outside-ip-address <ip>`.
 
-**Confirm:** both tunnels `UP` with ≥ 1 BGP route; both Azure peers `Connected`; alarm returns to OK
-(an OK email is sent).
+**Confirm:** all 4 tunnels `UP` with at least 1 BGP route each, all 4 Azure peers `Connected`,
+and the alarm back to OK.
 
 ---
 
 ## VPN down
 
-**Means:** both tunnels (or both BGP sessions) are down, or the VPN stopped reporting metrics.
-**Impact:** no private path between clouds. BGP withdraws `10.20.0.0/16` from the AWS private route
-table and `10.10.0.0/16` from Azure. AWS traffic to Azure's private IPs then matches the default
-route (`0.0.0.0/0 → NAT`) and is dropped — private IPs aren't routable on the internet (fails closed).
-**Public traffic (`app.jeevs.click`) is unaffected.**
+**Means:**
+- **One connection down (`-c0-down` / `-c1-down`):** both tunnels to one Azure gateway
+  instance are down. Usually that instance is being patched, was reset, or failed.
+- **Link down:** all 4 tunnels are down.
 
-**Check** — everything in [VPN degraded](#vpn-degraded), plus:
+**Impact:**
+- **One connection:** none, because the other instance carries traffic.
+- **Link down:** BGP withdraws the Azure prefixes from the Transit Gateway's inspection route
+  table, and the AWS prefixes from Azure. Cross-cloud traffic then fails closed: the firewalls
+  have no route for it, and private IPs aren't routable on the internet. **Public traffic is
+  unaffected.**
+
+**Check:** everything in [VPN degraded](#vpn-degraded), plus:
 ```bash
-# Did the Azure gateway's public IP change (e.g. after a rebuild)? AWS's customer gateway must match it.
-az network public-ip show -g cloudbridge-rg -n cloudbridge-vpngw-pip --query ipAddress -o tsv
-aws ec2 describe-customer-gateways --query "CustomerGateways[].IpAddress" --output text
-
-# Is the Azure gateway itself healthy?
+# Do the customer gateways still match the Azure gateway instance IPs (e.g. after a rebuild)?
+az network public-ip list -g cloudbridge-rg --query "[?starts_with(name,'cloudbridge-vpngw')].{n:name,ip:ipAddress}" -o table
+aws ec2 describe-customer-gateways --filters Name=tag:Project,Values=cloudbridge --query "CustomerGateways[].IpAddress" --output text
+# Is the gateway healthy?
 az network vnet-gateway show -g cloudbridge-rg -n cloudbridge-vpngw --query provisioningState -o tsv
-
-# Route tables: is the other cloud's prefix still there?
-aws ec2 describe-route-tables --route-table-ids <private-rtb-id> --query "RouteTables[].Routes[]" --output table
+# What does each side still know?
+aws ec2 search-transit-gateway-routes --transit-gateway-route-table-id <inspection-rt> --filters Name=type,Values=propagated --output table
 az network vnet-gateway list-learned-routes -g cloudbridge-rg -n cloudbridge-vpngw -o table
 ```
 
 **Fix**
-1. Everything in [VPN degraded](#vpn-degraded), for both tunnels.
-2. Customer-gateway IP doesn't match the Azure gateway IP → `terraform apply` in `connectivity/vpn`
-   (it reads the IP from the network layer's state and replaces the customer gateway).
-3. Reset the Azure gateway (both tunnels drop for a few minutes):
-   ```bash
-   az network vnet-gateway reset -g cloudbridge-rg -n cloudbridge-vpngw
-   ```
-4. Rebuild the VPN layer (~10 min; new tunnel IPs and PSKs are generated automatically):
-   ```bash
-   cd terraform/connectivity/vpn && terraform destroy && terraform apply   # (user runs these)
-   ```
+1. Everything in [VPN degraded](#vpn-degraded), for each affected tunnel.
+2. A customer gateway IP doesn't match → `terraform apply` in `connectivity/vpn`. It reads the IPs
+   from azure/hub's state and replaces the customer gateway.
+3. Reset one gateway instance only:
+   `az network vnet-gateway reset -g cloudbridge-rg -n cloudbridge-vpngw --gateway-vip <instance-ip>`.
+4. Rebuild the VPN layer (about 10 min; new tunnel IPs and PSKs are generated):
+   `terraform destroy && terraform apply` in `connectivity/vpn` (you run these).
 
-**Fallbacks if it stays down**
-- BGP is the problem but IPsec is up → temporary static routes (`static_routes_only = true` on the AWS
-  VPN connection, `bgp_enabled = false` + `address_space` on the Azure local gateways).
-- Need cross-cloud calls now → use the other cloud's public endpoint over TLS until the VPN is back.
-
-**Confirm:** as in VPN degraded, plus a pod-to-pod ping across clouds:
-```bash
-kubectl --context cloudbridge-eks run xtest --image=busybox:1.36 --restart=Never --rm -i -- ping -c 3 <aks-pod-ip>
-```
+**Confirm:** as in VPN degraded, plus `tests/test3-hybrid-routing.sh check` passes (ping and
+HTTP from the Azure firewall to both AWS test hosts).
 
 ---
 
 ## BGP peer down
 
-**Means:** Azure Monitor sees a BGP peer (`169.254.21.1` or `169.254.22.1`) not connected for 5 min.
-It's the Azure view of the same fault as the AWS alarms; one peer = [VPN degraded](#vpn-degraded),
-both = [VPN down](#vpn-down).
+**Means:** Azure Monitor sees one of the 4 AWS BGP peers not connected for 5 min. It's the Azure
+view of the same faults as the AWS alarms.
 
-**Check first:** is IPsec up but BGP down (connection `Connected`, peer not)? Then it's a BGP config
-problem — compare against the IP plan:
+**Check first:** is IPsec up but BGP down (connection `Connected`, peer not)? Then it's a BGP
+config problem. Compare against the IP plan:
 
 | Setting | Must be |
 |---|---|
-| AWS ASN (on the Azure local gateways) | `64512` |
+| AWS ASN (Transit Gateway, on the Azure local network gateways) | `64512` |
 | Azure ASN | `65515` |
-| Tunnel 1 BGP | AWS `169.254.21.1` ↔ Azure `169.254.21.2` |
-| Tunnel 2 BGP | AWS `169.254.22.1` ↔ Azure `169.254.22.2` |
+| c0 tunnels (Azure instance0) | AWS `169.254.21.1` ↔ Azure `.21.2`, AWS `169.254.22.1` ↔ Azure `.22.2` |
+| c1 tunnels (Azure instance1) | AWS `169.254.21.5` ↔ Azure `.21.6`, AWS `169.254.22.5` ↔ Azure `.22.6` |
 
 `terraform plan` in `connectivity/vpn` shows any drift from these values; `apply` fixes it.
 
@@ -127,53 +116,53 @@ problem — compare against the IP plan:
 
 ## App failover (AWS → Azure)
 
-**Means:** the Route 53 health check on the AWS ALB's `/health` failed 3 times in a row (10 s apart).
-Route 53 now answers `app.jeevs.click` with the Azure IP.
-**Impact (measured):** errors for ~1–2 min — Route 53 detects in ≤ ~60 s, then client resolvers keep
-the AWS answer for up to its 60 s TTL. After that, Azure serves everything. Nothing has to be started
-in Azure (warm standby).
+**Means:** both DNS providers have moved `app.jeevs.click` to Azure:
+- **Route 53:** the AWS health check (deep `/health` on the ALB, 10 s × 3) is unhealthy, so the
+  SECONDARY record (the Azure firewall IP) answers.
+- **Traffic Manager:** the `aws-alb` endpoint is Degraded, so it answers with the Azure firewall's
+  FQDN.
 
-**Check — what broke in AWS?**
+**Impact:** about 36–42 s of errors (measured in Tests 1 and 2), then users are served by Azure.
+The VPN isn't involved.
+
+**Check**
 ```bash
-aws route53 get-health-check-status --health-check-id <aws-health-check-id> \
-  --query 'HealthCheckObservations[].StatusReport.Status' --output text      # what the checkers see
-curl -s -w ' [%{http_code}]\n' http://<alb-dns-name>/health                   # deep check, direct
-kubectl --context cloudbridge-eks -n cloudbridge get pods -o wide             # pods Ready?
-kubectl --context cloudbridge-eks -n cloudbridge describe pod -l app=frontend | grep -A3 Readiness
-kubectl --context cloudbridge-eks -n cloudbridge exec deploy/frontend -- \
-  python3 -c "import socket;print(socket.gethostbyname('backend.cloudbridge.internal'))"
+tests/test1-dns-no-spof.sh check        # answers from every Route 53 and Azure name server, health checks, HTTP
+az network traffic-manager endpoint list -g cloudbridge-rg --profile-name cloudbridge-app \
+  --query "[].[name,priority,endpointMonitorStatus]" -o table
+curl -s http://<alb-dns>/health         # what is failing on AWS?
+kubectl --context cloudbridge-eks -n cloudbridge get pods
 ```
 
-| What you see | Cause | Fix |
-|---|---|---|
-| Frontends `0/1`, backend name doesn't resolve | Backend DNS record missing (Test 1) | `tests/backend-dns.sh set` |
-| No pods / deployments at 0 | App gone (Test 2) | `kubectl scale deploy/frontend deploy/backend --replicas=3` |
-| Pods Pending, nodes NotReady | Node failure (Test 3) | Managed node group replaces the node; check `kubectl get nodes` |
-| ALB 5xx but pods Ready | ALB / target group | Check target health in the target group |
+**Fix:** restore the AWS app (pods, nodes, ALB targets). Failback is automatic once `/health`
+passes again: 14.5–15.7 s measured.
 
-**Failback:** automatic. Once `/health` passes 3 checks, Route 53 answers with AWS again; clients follow
-within ~1–1.5 min (measured 68–93 s). Zero failed requests during failback in every test run.
+**If Azure fails too:** both providers answer AWS (PRIMARY / priority 1) when every endpoint is
+unhealthy, so there is no automatic third path.
 
-**Confirm**
+## DNS provider unreachable
+
+**Means:** resolvers can't reach one provider's name servers. The registrar lists 2 Route 53 + 2
+Azure DNS servers, so resolvers retry the other provider.
+
+**Impact:** measured with Route 53 fully unreachable: lookups took about +140 ms, and 304/304 were
+answered by Azure DNS.
+
+**Check**
 ```bash
-dig +short app.jeevs.click                 # the ALB's IPs again
-curl -s http://app.jeevs.click/            # "cloud":"aws"
+tests/test1-dns-no-spof.sh delegation   # the TLD lists all 4 servers
+dig @ns1-01.azure-dns.com app.jeevs.click +norecurse   # (current Azure server names: terraform -chdir=terraform/global/dns output azure_nameservers)
 ```
 
-**Don't:** edit Route 53 records by hand to force failover — that's a control-plane call (us-east-1)
-and fights the health checks. To force a failover for testing, break the AWS health instead.
+**Note:** the ALB's own name is served by Route 53. In a total Route 53 outage, AWS can't be
+resolved even if it's healthy, so users end up on Azure.
 
----
+## After destroying `global/dns`
 
-## Teardown and rebuild
-
-**Destroy (end of session), reverse order:** `global/dns` → `aws/eks` + `azure/aks` →
-`connectivity/vpn` → `aws/network` + `azure/network`. Keep `bootstrap`. Uninstall Helm releases and
-delete the app namespace first, so controller-created load balancers aren't orphaned:
+Destroying the layer does **not** reset the registrar name servers or the zone's apex NS. Run
+`~/cloudbridge-restore-ns.sh` (saved by the session 3 runbook right after the apply). It puts the 4
+Route 53 servers back in both places. Then confirm:
 ```bash
-kubectl --context cloudbridge-eks delete namespace cloudbridge      # removes ALB + NLB
-helm --kube-context cloudbridge-eks uninstall aws-load-balancer-controller -n kube-system
-kubectl --context cloudbridge-aks delete namespace cloudbridge      # removes the Azure LB rule
+aws route53domains get-domain-detail --region us-east-1 --domain-name jeevs.click --query '{auto:AutoRenew,ns:Nameservers[].Name}'
+# auto-renew must stay false
 ```
-**Rebuild:** forward order; start `azure/network` first (gateway 30–45 min). Re-confirm the SNS
-email subscription after rebuilding `connectivity/vpn`.

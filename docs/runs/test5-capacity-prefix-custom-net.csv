@@ -1,0 +1,8 @@
+label,step,time,running,unscheduled,scheduled_no_ip,pods_per_node,free_ips_per_subnet,first_stuck
+prefix-custom-net,40,2026-11-23T21:17:11Z,40,0,0,ip-10-10-0-111=28;ip-10-10-0-15=28,node-a=56;node-b=57;pod-a=8138;pod-b=8138,""
+prefix-custom-net,80,2026-11-23T21:17:35Z,80,0,0,ip-10-10-0-111=48;ip-10-10-0-15=48,node-a=56;node-b=57;pod-a=8122;pod-b=8122,""
+prefix-custom-net,120,2026-11-23T21:18:10Z,120,0,0,ip-10-10-0-111=68;ip-10-10-0-15=68,node-a=56;node-b=57;pod-a=8089;pod-b=8089,""
+prefix-custom-net,160,2026-11-23T21:18:34Z,160,0,0,ip-10-10-0-111=88;ip-10-10-0-15=88,node-a=56;node-b=57;pod-a=8073;pod-b=8073,""
+prefix-custom-net,200,2026-11-23T21:18:58Z,200,0,0,ip-10-10-0-111=108;ip-10-10-0-15=108,node-a=55;node-b=56;pod-a=8073;pod-b=8073,""
+prefix-custom-net,230,2026-11-23T21:19:22Z,204,26,0,ip-10-10-0-111=110;ip-10-10-0-15=110,node-a=55;node-b=56;pod-a=8073;pod-b=8073,"Pending (unschedulable) pause-85597cfc4b-56lfw: FailedScheduling: 0/2 nodes are available: 2 Too many pods. no new claims to deallocate; preemption: 0/2 nodes are available: 2 No preemption victims found for incoming pod. "
+prefix-custom-net,250,2026-11-23T21:19:46Z,204,46,0,ip-10-10-0-111=110;ip-10-10-0-15=110,node-a=55;node-b=56;pod-a=8073;pod-b=8073,"Pending (unschedulable) pause-85597cfc4b-24fg9: FailedScheduling: 0/2 nodes are available: 2 Too many pods. no new claims to deallocate; preemption: 0/2 nodes are available: 2 No preemption victims found for incoming pod. "

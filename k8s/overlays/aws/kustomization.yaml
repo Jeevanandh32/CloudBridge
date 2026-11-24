@@ -1,3 +1,12 @@
+# EKS: the app behind a public ALB in the app spoke's public subnets.
+#
+# v1 also put an internal NLB in front of the backend and pointed the frontend at
+# backend.cloudbridge.internal (a Route 53 private record on that NLB), so Test 1 could empty
+# the record. The current setup drops both: the frontend calls the backend Service directly
+# (http://backend:8080, from the base) and nothing creates a second load balancer.
+# If Test 1 Part A (Session 3) needs the dependency record again, bring back
+# k8s/overlays/aws/backend-nlb.yaml from tag v1, add the record in aws/spoke-app, and
+# re-add the BACKEND_URL patch below.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
@@ -8,17 +17,9 @@ images:
     newName: REGISTRY/cloudbridge-app  # filled in by k8s/deploy.sh from Terraform outputs
     newTag: v1
 patches:
-  - path: backend-nlb.yaml
   # CLOUD=aws on both deployments (env index 1 in the base)
   - target: { kind: Deployment }
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/env/1/value
         value: aws
-  # The frontend reaches the backend through private DNS, like an app calling a regional
-  # AWS endpoint by name. Test 1 empties this record.
-  - target: { kind: Deployment, name: frontend }
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/env/2/value
-        value: http://backend.cloudbridge.internal:8080

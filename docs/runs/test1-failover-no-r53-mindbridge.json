@@ -1,0 +1,268 @@
+{
+ "saved_at": "2026-11-23T22:51:18Z",
+ "report": "../mindbridge/whatif-report.json",
+ "report_mtime": "2026-11-23T21:39:53Z",
+ "method": "N-1: remove each component, evaluate every flow. severity = flow weight x impact x recovery penalty",
+ "components": {
+  "dns-route53": {
+   "component": "dns-route53",
+   "name": "Route 53 public zone name servers",
+   "cloud": "aws",
+   "layer": "planned",
+   "planned_layer": "global/dns",
+   "status": "planned",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 10.49,
+   "band": "low",
+   "worst_status": "degraded",
+   "recovery": "auto",
+   "recovery_s": 3.0,
+   "redundancy_s": null,
+   "summary": "users recover in ~3 s; redundancy is reduced until the component is fixed",
+   "failure_mode": null,
+   "failure_modes": {},
+   "flows": [
+    {
+     "flow": "users-app",
+     "weight": 10,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 3.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "dns-authoritative",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 3.0,
+       "lost": [
+        "dns-route53"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 5.25,
+     "flow_name": "Users -> app.jeevs.click (AWS active, Azure failover via DNS health checks)"
+    },
+    {
+     "flow": "aws-ingress",
+     "weight": 5,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 3.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "dns-authoritative",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 3.0,
+       "lost": [
+        "dns-route53"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 2.62,
+     "flow_name": "Users -> ALB -> EKS (active path)"
+    },
+    {
+     "flow": "azure-ingress",
+     "weight": 5,
+     "status": "degraded",
+     "impact_pct": 50.0,
+     "recovery": "auto",
+     "recovery_s": 3.0,
+     "redundancy_lost_pct": 50.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "dns-authoritative",
+       "impact_pct": 50.0,
+       "recovery": "auto",
+       "recovery_s": 3.0,
+       "lost": [
+        "dns-route53"
+       ],
+       "redundancy_lost_pct": 50.0,
+       "redundancy_s": null,
+       "note": "1 of 2 members carry the traffic"
+      }
+     ],
+     "severity": 2.62,
+     "flow_name": "Users / health checks -> Azure firewall DNAT -> AKS ILB (failover path)"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "dns-provider",
+   "fixes": [
+    {
+     "mitigation": "Already two providers listed at the registrar; resolvers retry the other one",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 36
+  },
+  "dns-failover-tm": {
+   "component": "dns-failover-tm",
+   "name": "Traffic Manager priority profile (behind the Azure DNS CNAME)",
+   "cloud": "azure",
+   "layer": "planned",
+   "planned_layer": "global/dns",
+   "status": "planned",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 0.0,
+   "band": "none",
+   "worst_status": "ok",
+   "recovery": "none",
+   "recovery_s": null,
+   "redundancy_s": null,
+   "summary": "",
+   "failure_mode": null,
+   "failure_modes": {},
+   "flows": [],
+   "transition_risk": null,
+   "risk": "dns-health-check",
+   "fixes": [
+    {
+     "mitigation": "Already two independent health-check systems (Route 53, Traffic Manager)",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 43
+  },
+  "dns-failover-r53": {
+   "component": "dns-failover-r53",
+   "name": "Route 53 health checks + failover records",
+   "cloud": "aws",
+   "layer": "planned",
+   "planned_layer": "global/dns",
+   "status": "planned",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 0.0,
+   "band": "none",
+   "worst_status": "ok",
+   "recovery": "none",
+   "recovery_s": null,
+   "redundancy_s": null,
+   "summary": "",
+   "failure_mode": null,
+   "failure_modes": {},
+   "flows": [],
+   "transition_risk": null,
+   "risk": "dns-health-check",
+   "fixes": [
+    {
+     "mitigation": "Already two independent health-check systems (Route 53, Traffic Manager)",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 42
+  },
+  "aws-alb": {
+   "component": "aws-alb",
+   "name": "ALB (made by the AWS LB controller)",
+   "cloud": "aws",
+   "layer": "planned",
+   "planned_layer": "aws/eks",
+   "status": "planned",
+   "kind": "managed",
+   "section": "infrastructure",
+   "severity": 45.0,
+   "band": "medium",
+   "worst_status": "broken",
+   "recovery": "provider",
+   "recovery_s": null,
+   "redundancy_s": null,
+   "summary": "users stay affected until the provider restores it",
+   "failure_mode": null,
+   "failure_modes": {},
+   "flows": [
+    {
+     "flow": "users-app",
+     "weight": 10,
+     "status": "degraded",
+     "impact_pct": 100.0,
+     "recovery": "auto",
+     "recovery_s": 90.0,
+     "redundancy_lost_pct": 0.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "aws-ingress broken; DNS health checks move users to azure-ingress",
+     "hops_hit": [
+      {
+       "hop": "aws-alb",
+       "impact_pct": 100.0,
+       "recovery": "provider",
+       "recovery_s": null,
+       "lost": [
+        "aws-alb"
+       ]
+      }
+     ],
+     "severity": 25.0,
+     "flow_name": "Users -> app.jeevs.click (AWS active, Azure failover via DNS health checks)"
+    },
+    {
+     "flow": "aws-ingress",
+     "weight": 5,
+     "status": "broken",
+     "impact_pct": 100.0,
+     "recovery": "provider",
+     "recovery_s": null,
+     "redundancy_lost_pct": 0.0,
+     "redundancy_s": null,
+     "failure_mode": null,
+     "note": "",
+     "hops_hit": [
+      {
+       "hop": "aws-alb",
+       "impact_pct": 100.0,
+       "recovery": "provider",
+       "recovery_s": null,
+       "lost": [
+        "aws-alb"
+       ]
+      }
+     ],
+     "severity": 20.0,
+     "flow_name": "Users -> ALB -> EKS (active path)"
+    }
+   ],
+   "transition_risk": null,
+   "risk": "managed-service",
+   "fixes": [
+    {
+     "mitigation": "Accept: provider-run multi-AZ service; covered by the cross-cloud DNS failover where it is on the user path",
+     "usd_per_hr": 0.0,
+     "blocked": false,
+     "blocked_by": []
+    }
+   ],
+   "rank": 16
+  }
+ }
+}

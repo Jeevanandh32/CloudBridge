@@ -1,0 +1,73 @@
+#cloud-config
+# AWS firewall VM: routing, stateful filtering, NAT, MSS clamp, DNS forwarding.
+package_update: true
+packages:
+  - dnsmasq
+  - tcpdump
+  - conntrack
+
+write_files:
+  - path: /etc/sysctl.d/90-cloudbridge.conf
+    content: |
+      net.ipv4.ip_forward = 1
+      # Single interface: traffic enters and leaves on the same NIC, so loose reverse-path checks
+      net.ipv4.conf.all.rp_filter = 2
+      net.ipv4.conf.default.rp_filter = 2
+
+  - path: /etc/nftables.conf
+    content: |
+      #!/usr/sbin/nft -f
+      flush ruleset
+
+      table inet fw {
+        chain input {
+          type filter hook input priority 0; policy accept;
+        }
+
+        # Stateful: a reply is only allowed if this firewall saw the request.
+        # That is exactly what breaks when TGW appliance mode is off (Test 4).
+        chain forward {
+          type filter hook forward priority 0; policy drop;
+          ct state established,related accept
+          ct state invalid counter log prefix "fw-invalid " level info drop
+          ip saddr 10.0.0.0/8 ct state new counter accept
+          counter log prefix "fw-drop " level info drop
+        }
+
+        # IPsec leaves ~1400 bytes of MTU; clamp TCP to Azure so large segments don't black-hole
+        chain mss {
+          type filter hook forward priority mangle; policy accept;
+          ip daddr 10.20.0.0/16 tcp flags syn tcp option maxseg size set ${mss}
+          ip saddr 10.20.0.0/16 tcp flags syn tcp option maxseg size set ${mss}
+        }
+      }
+
+      table ip nat {
+        # Private -> internet: source becomes this VM, the IGW maps it to the public IP
+        chain postrouting {
+          type nat hook postrouting priority srcnat; policy accept;
+          ip saddr 10.0.0.0/8 ip daddr != 10.0.0.0/8 counter masquerade
+        }
+      }
+
+  - path: /etc/dnsmasq.d/cloudbridge.conf
+    content: |
+      # Hybrid DNS forwarder (instead of Route 53 Resolver endpoints at ~$0.25/hr each)
+      listen-address=${fw_ip}
+      bind-interfaces
+      no-resolv
+      # Azure private zones -> Azure firewall's forwarder -> Azure DNS (168.63.129.16)
+      server=/az.cloudbridge.internal/${azure_fw_ip}
+      server=/privatelink.blob.core.windows.net/${azure_fw_ip}
+      server=/blob.core.windows.net/${azure_fw_ip}
+      # Everything else, including the cloudbridge.internal private zone -> VPC resolver
+      server=${vpc_dns}
+      log-queries
+      log-facility=/var/log/dnsmasq.log
+
+runcmd:
+  - sysctl --system
+  - systemctl enable --now nftables
+  - nft -f /etc/nftables.conf
+  - systemctl restart dnsmasq
+  - systemctl enable dnsmasq

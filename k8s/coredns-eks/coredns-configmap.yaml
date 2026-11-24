@@ -1,0 +1,55 @@
+# EKS CoreDNS with cross-cloud forwarding. EKS keeps the VPC resolver (AmazonProvidedDNS) for
+# everything, which knows cloudbridge.internal (Route 53 private zone) but not Azure's private
+# zones. This adds one server block that sends Azure names to the AWS firewalls' dnsmasq
+# (fw-a 10.10.240.40, fw-b 10.10.240.56), which forwards them to the Azure firewall, which
+# asks Azure DNS (168.63.129.16) in the hub, where the private zones are linked.
+#
+# Zones forwarded:
+#   az.cloudbridge.internal            Azure private names (fw.az.cloudbridge.internal)
+#   privatelink.blob.core.windows.net  the Private Endpoint's A record
+#   blob.core.windows.net              needed as well: a pod asks for <account>.blob.core.windows.net,
+#                                      and the resolver that gets THAT query follows the CNAME to
+#                                      privatelink.... itself. If the VPC resolver got it, it would
+#                                      return the public IP. The AWS firewalls forward this zone too.
+#
+# The default block below is the EKS CoreDNS add-on's own Corefile, unchanged.
+# Applying this takes the ConfigMap over from the add-on: a later add-on update with
+# resolve_conflicts=OVERWRITE puts the default back. The Terraform-native way is the add-on's
+# configuration_values (see addon-configuration.json); either gives the same Corefile.
+# CoreDNS's reload plugin picks the change up within ~30 s; no restart needed.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+  labels:
+    eks.amazonaws.com/component: coredns
+    k8s-app: kube-dns
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health {
+            lameduck 5s
+          }
+        ready
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+          pods insecure
+          fallthrough in-addr.arpa ip6.arpa
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf
+        cache 30
+        loop
+        reload
+        loadbalance
+    }
+    az.cloudbridge.internal:53 privatelink.blob.core.windows.net:53 blob.core.windows.net:53 {
+        errors
+        cache 30
+        forward . 10.10.240.40 10.10.240.56 {
+          policy sequential
+          health_check 5s
+        }
+        reload
+    }

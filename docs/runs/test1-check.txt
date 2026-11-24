@@ -1,0 +1,61 @@
+== 2026-11-23T22:48:41Z check of jeevs.click
+-- registrar name servers (Route 53 Domains)
+  ns-1018.awsdns-63.net
+  ns-1232.awsdns-26.org
+  ns1-01.azure-dns.com
+  ns2-01.azure-dns.net
+-- Route 53 hosted zone name servers
+-- Azure DNS zone name servers
+  ns1-01.azure-dns.com
+  ns2-01.azure-dns.net
+  ns3-01.azure-dns.org
+  ns4-01.azure-dns.info
+
+== Delegation from the .click TLD servers (dig +norecurse NS jeevs.click @<tld>)
+  ns01.trs-dns.com             ns-1018.awsdns-63.net ns-1232.awsdns-26.org ns1-01.azure-dns.com ns2-01.azure-dns.net 
+  ns01.trs-dns.net             ns-1018.awsdns-63.net ns-1232.awsdns-26.org ns1-01.azure-dns.com ns2-01.azure-dns.net 
+  ns10.trs-dns.info            ns-1018.awsdns-63.net ns-1232.awsdns-26.org ns1-01.azure-dns.com ns2-01.azure-dns.net 
+  ns10.trs-dns.org             ns-1018.awsdns-63.net ns-1232.awsdns-26.org ns1-01.azure-dns.com ns2-01.azure-dns.net 
+  full referral from ns01.trs-dns.com:
+    jeevs.click.		900	IN	NS	ns2-01.azure-dns.net.
+    jeevs.click.		900	IN	NS	ns-1232.awsdns-26.org.
+    jeevs.click.		900	IN	NS	ns1-01.azure-dns.com.
+    jeevs.click.		900	IN	NS	ns-1018.awsdns-63.net.
+
+== Apex NS that each provider serves (the child-side NS set)
+  ns1-01.azure-dns.com             ns-1018.awsdns-63.net ns-1232.awsdns-26.org ns1-01.azure-dns.com ns2-01.azure-dns.net ns3-01.azure-dns.org ns4-01.azure-dns.info 
+  ns2-01.azure-dns.net             ns-1018.awsdns-63.net ns-1232.awsdns-26.org ns1-01.azure-dns.com ns2-01.azure-dns.net ns3-01.azure-dns.org ns4-01.azure-dns.info 
+  ns3-01.azure-dns.org             ns-1018.awsdns-63.net ns-1232.awsdns-26.org ns1-01.azure-dns.com ns2-01.azure-dns.net ns3-01.azure-dns.org ns4-01.azure-dns.info 
+  ns4-01.azure-dns.info            ns-1018.awsdns-63.net ns-1232.awsdns-26.org ns1-01.azure-dns.com ns2-01.azure-dns.net ns3-01.azure-dns.org ns4-01.azure-dns.info 
+
+== app.jeevs.click at every authoritative server (dig +norecurse @ns)
+  -- @ns1-01.azure-dns.com
+     opcode: QUERY, status: NOERROR, id: 22282
+     app.jeevs.click.	30	IN	CNAME	cloudbridge-app-65e29c.trafficmanager.net.
+  -- @ns2-01.azure-dns.net
+     opcode: QUERY, status: NOERROR, id: 45069
+     app.jeevs.click.	30	IN	CNAME	cloudbridge-app-65e29c.trafficmanager.net.
+  -- @ns3-01.azure-dns.org
+     opcode: QUERY, status: NOERROR, id: 41876
+     app.jeevs.click.	30	IN	CNAME	cloudbridge-app-65e29c.trafficmanager.net.
+  -- @ns4-01.azure-dns.info
+     opcode: QUERY, status: NOERROR, id: 53681
+     app.jeevs.click.	30	IN	CNAME	cloudbridge-app-65e29c.trafficmanager.net.
+
+== Traffic Manager: cloudbridge-app-65e29c.trafficmanager.net @tm1.dns-tm.com.
+  cloudbridge-app-65e29c.trafficmanager.net. 30 IN CNAME k8s-cloudbri-frontend-768f8ddba8-1486913397.us-east-2.elb.amazonaws.com.
+  profile: Enabled	None	30	/health	10	3
+  endpoint: 1	aws-alb	k8s-cloudbri-frontend-768f8ddba8-1486913397.us-east-2.elb.amazonaws.com	CheckingEndpoint
+  endpoint: 2	azure-fw	cloudbridge-fw-eva4q8.northcentralus.cloudapp.azure.com	CheckingEndpoint
+
+== app.jeevs.click through public resolvers
+  @1.1.1.1         app.jeevs.click. 30 CNAME cloudbridge-app-65e29c.trafficmanager.net. | cloudbridge-app-65e29c.trafficmanager.net. 30 CNAME k8s-cloudbri-frontend-768f8ddba8-1486913397.us-east-2.elb.amazonaws.com. | k8s-cloudbri-frontend-768f8ddba8-1486913397.us-east-2.elb.amazonaws.com. 60 A 3.21.183.6 | k8s-cloudbri-frontend-768f8ddba8-1486913397.us-east-2.elb.amazonaws.com. 60 A 3.13.253.10 | 
+  @8.8.8.8         app.jeevs.click. 30 CNAME cloudbridge-app-65e29c.trafficmanager.net. | cloudbridge-app-65e29c.trafficmanager.net. 30 CNAME k8s-cloudbri-frontend-768f8ddba8-1486913397.us-east-2.elb.amazonaws.com. | k8s-cloudbri-frontend-768f8ddba8-1486913397.us-east-2.elb.amazonaws.com. 60 A 3.13.253.10 | k8s-cloudbri-frontend-768f8ddba8-1486913397.us-east-2.elb.amazonaws.com. 60 A 3.21.183.6 | 
+  @9.9.9.9         app.jeevs.click. 60 A 3.21.183.6 | app.jeevs.click. 60 A 3.13.253.10 | 
+  @208.67.222.222  app.jeevs.click. 30 CNAME cloudbridge-app-65e29c.trafficmanager.net. | cloudbridge-app-65e29c.trafficmanager.net. 30 CNAME k8s-cloudbri-frontend-768f8ddba8-1486913397.us-east-2.elb.amazonaws.com. | k8s-cloudbri-frontend-768f8ddba8-1486913397.us-east-2.elb.amazonaws.com. 60 A 3.13.253.10 | k8s-cloudbri-frontend-768f8ddba8-1486913397.us-east-2.elb.amazonaws.com. 60 A 3.21.183.6 | 
+
+== Health checks and HTTP
+  Route 53: r53hc_aws=16/16 r53hc_azure=16/16 
+  Traffic Manager: tm_aws-alb=CheckingEndpoint tm_azure-fw=Online 
+  ALB  /health: {"status":"ok","cloud":"aws"}
+  Azure fw 20.221.222.24 /health: {"status":"ok","cloud":"azure"}

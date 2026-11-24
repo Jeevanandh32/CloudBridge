@@ -1,6 +1,8 @@
-# Public ALB for the frontend. IP target mode registers pod IPs directly.
+# Public ALB for the frontend, in the app spoke's public subnets (10.10.4.0/24, 10.10.5.0/24,
+# tagged kubernetes.io/role/elb). Inbound stays local to the spoke; only egress is centralized.
+# IP target mode registers pod IPs directly, so the ALB's own ENIs (10.10.4.0/23) are the
+# source the frontend sees: k8s/policies/aws allows exactly that range.
 # Health check uses the shallow /live; the deep /health check is Route 53's job.
-# ALB timers here are the AWS defaults (baseline); the tuned overlay overrides them.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

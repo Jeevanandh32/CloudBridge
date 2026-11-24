@@ -1,0 +1,20 @@
+# Every pod in the namespace may ask CoreDNS (k8s-app=kube-dns in kube-system on both EKS and
+# AKS), and nothing else. A blocked pod can still resolve names, so a failed curl proves the
+# policy dropped the connection, not that DNS was missing.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: cloudbridge
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }

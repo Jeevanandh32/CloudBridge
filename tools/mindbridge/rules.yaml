@@ -1,0 +1,273 @@
+# Precheck rules: map `terraform show -json <planfile>` resource_changes onto the model.
+#
+# match       resource address; [*] matches any index. An address without an index also
+#             matches every instance of that resource.
+# actions     any of delete, replace, update
+# attribute   for update: the attribute whose change triggers the rule
+# from / to   optional before / after values of that attribute
+# remove      component ids to treat as lost, or "mapped" = the components whose tf list
+#             contains this address (design.yaml)
+# phase       persistent  = stays broken after apply
+#             during-apply = down until the replacement finishes in the same apply
+# bgp_failure for changes that take BGP tunnels away: clean (the sessions are torn down and
+#             the routes withdrawn at once) or silent (the flows on those tunnels wait for the
+#             BGP hold timer). Unset = silent. Precheck reports both modes, labelled, and the
+#             verdict uses this one. Measured 2026-11-23 (Test 3): clean = 0 of 16 flows hit,
+#             ~0 s; silent = 6 of 16 flows (38 %) with a 22-31 s gap for 2 of 4 tunnels.
+# match_type  instead of match: any resource of this type
+#
+# Rules are tried in order; the first match wins. A delete or replace with no rule falls
+# back to the generic "mapped" rule at the bottom.
+
+threshold: 5   # block when a flow with weight >= this would be degraded or broken
+
+rules:
+  - id: test4-break-a-propagation-removed
+    match: aws_ec2_transit_gateway_route_table_propagation.app_to_inspection[*]
+    actions: [delete]
+    remove: [tgw-prop-app-to-inspection]
+    phase: persistent
+    message: >-
+      The TGW inspection table loses the app spoke's routes. Traffic from Azure still reaches the
+      firewalls, but their replies to the spoke blackhole (Test 4 break A).
+
+  - id: test4-break-b-appliance-mode-off
+    match: aws_ec2_transit_gateway_vpc_attachment.inspection
+    actions: [update]
+    attribute: appliance_mode_support
+    from: enable
+    to: disable
+    remove: [tgw-appliance-mode]
+    phase: persistent
+    message: >-
+      Appliance mode off. Only VPC<->VPC flows between AZ-pinned attachments are at risk of
+      asymmetric drops (ct state invalid on the other firewall). VPN<->VPC flows were measured
+      2026-11-23 with it off: 400/400 ok, all 400 flows symmetric (Test 4 break B). The toggle
+      itself is the bigger risk: see the transition below.
+
+  - id: aws-firewall-replaced
+    match: aws_instance.fw[*]
+    actions: [replace]
+    remove: mapped
+    phase: during-apply
+    message: >-
+      A firewall instance is replaced. Its AZ's share is down until the new instance boots and
+      aws_route.tgw_to_fw is repointed at the new ENI in the same apply. If both firewalls are
+      replaced at once (for example a cloud-init change with user_data_replace_on_change), every
+      inspected flow is down for the apply.
+
+  - id: aws-firewall-deleted
+    match: aws_instance.fw[*]
+    actions: [delete]
+    remove: mapped
+    phase: persistent
+    message: >-
+      A firewall instance is deleted. The TGW subnet route in its AZ is pinned to that ENI, so
+      that AZ's share of traffic has no firewall until someone fixes it.
+
+  - id: aws-firewall-route-changed
+    match: aws_route.tgw_to_fw[*]
+    actions: [delete, replace]
+    remove: mapped
+    phase: during-apply
+    message: "The per-AZ TGW subnet route to a firewall is deleted or recreated."
+
+  - id: aws-firewall-route-repointed
+    match: aws_route.tgw_to_fw[*]
+    actions: [update]
+    attribute: network_interface_id
+    remove: mapped
+    phase: during-apply
+    message: "The AZ's TGW subnet route is repointed to a new firewall ENI; that AZ's share has no firewall until it is."
+
+  - id: vpn-connection-replaced
+    match: aws_vpn_connection.azure[*]
+    actions: [replace]
+    remove: mapped
+    phase: during-apply
+    message: >-
+      A VPN connection is replaced: AWS picks new tunnel outside IPs and the PSKs are reset, so
+      its 2 tunnels stay down until the Azure local network gateways and connections are updated
+      later in the same apply. The BGP sessions are torn down, so this is a clean withdrawal: the
+      flows move to c1 at once, but redundancy is 2 of 4 tunnels until the apply ends. Never
+      replace c0 and c1 in one apply.
+    bgp_failure: clean
+
+  - id: vpn-connection-deleted
+    match: aws_vpn_connection.azure[*]
+    actions: [delete]
+    remove: mapped
+    phase: persistent
+    message: "A VPN connection is deleted: its 2 tunnels are gone (clean withdrawal)."
+    bgp_failure: clean
+
+  - id: vpn-psk-changed
+    match: aws_vpn_connection.azure[*]
+    actions: [update]
+    attribute: tunnel1_preshared_key
+    remove: mapped
+    phase: during-apply
+    message: "Tunnel 1 PSK changes: the tunnel drops until the Azure connection gets the new key."
+
+  - id: vpn-psk2-changed
+    match: aws_vpn_connection.azure[*]
+    actions: [update]
+    attribute: tunnel2_preshared_key
+    remove: mapped
+    phase: during-apply
+    message: "Tunnel 2 PSK changes: the tunnel drops until the Azure connection gets the new key."
+
+  - id: azure-lng-address-changed
+    match: azurerm_local_network_gateway.aws[*]
+    actions: [update]
+    attribute: gateway_address
+    remove: mapped
+    phase: during-apply
+    bgp_failure: clean
+    message: >-
+      The Azure local network gateway gets a new AWS tunnel address; that tunnel is down until
+      both ends match. This follows a VPN connection replacement (the AWS end is already gone),
+      and Azure tears its own connection down, so it is treated as a clean withdrawal.
+
+  - id: azure-active-active-off
+    match: azurerm_virtual_network_gateway.vpngw
+    actions: [update]
+    attribute: active_active
+    from: true
+    to: false
+    remove: [az-vpngw-i1]
+    phase: persistent
+    message: >-
+      active_active false: the gateway drops to one instance, so connection c1 and its 2 tunnels
+      lose their Azure end. The gateway also reconfigures, which can interrupt instance0 briefly.
+      Treated as a silent failure (not measured): flows on c1 wait for the BGP hold timer.
+
+  - id: azure-vpn-gateway-replaced
+    match: azurerm_virtual_network_gateway.vpngw
+    actions: [replace, delete]
+    remove: mapped
+    phase: during-apply
+    message: >-
+      The VPN gateway is replaced: both instances and all 4 tunnels are gone for the 30-45 minute
+      rebuild, and the public IPs the AWS customer gateways point at may change.
+
+  - id: azure-firewall-replaced
+    match: azurerm_linux_virtual_machine.fw
+    actions: [replace]
+    remove: mapped
+    phase: during-apply
+    message: >-
+      The only Azure firewall VM is replaced: Azure ingress, AKS egress, the VPN path and Azure-side
+      DNS are down until the new VM has booted and run cloud-init.
+
+  - id: azure-firewall-deleted
+    match: azurerm_linux_virtual_machine.fw
+    actions: [delete]
+    remove: mapped
+    phase: persistent
+    message: "The only Azure firewall VM is deleted."
+
+  - id: tgw-vpn-association-changed
+    match_type: aws_ec2_transit_gateway_route_table_association
+    actions: [delete, replace]
+    remove: mapped
+    phase: auto
+    bgp_failure: clean
+    message: >-
+      A TGW route-table association is removed or recreated. The TGW withdraws the attachment's
+      routes itself (clean), after a few seconds of route-table convergence.
+
+  - id: tgw-propagation-removed
+    match_type: aws_ec2_transit_gateway_route_table_propagation
+    actions: [delete, replace]
+    remove: mapped
+    phase: auto
+    bgp_failure: clean
+    message: >-
+      A TGW route-table propagation is removed or recreated. The TGW drops the routes itself,
+      so any BGP paths that depend on it are withdrawn cleanly (after a few seconds of route-table
+      convergence).
+
+  - id: generic-mapped
+    match: "*"
+    actions: [delete, replace]
+    remove: mapped
+    phase: auto     # delete -> persistent, replace -> during-apply
+    message: "Resource removed or recreated; mapped to its model component."
+
+# Transition risks: changing these attributes on live traffic is disruptive in itself, in
+# either direction. Every matching change is reported (not first-match), and blocks unless
+# blocks: false.
+transitions:
+  - id: appliance-mode-transition
+    match_type: aws_ec2_transit_gateway_vpc_attachment
+    actions: [update]
+    attribute: appliance_mode_support
+    window: appliance_mode_transition_s
+    blocks: true
+    message: >-
+      Maintenance window only: changing appliance_mode_support on live traffic re-pins the
+      TGW's AZ hashing, in either direction. Measured 2026-11-23 (Test 4 restore B): when it was
+      re-enabled, only 22-40 % of new flows succeeded for several minutes (fw-invalid drops
+      50 -> 404 on fw-a, 39 -> 364 on fw-b, SYN_SENT [UNREPLIED] entries on both firewalls), and
+      it took ~14 min to get back to 100 % without intervention. Set it at build time; if it must
+      change, do it in a maintenance window and expect ~14 min of drops.
+
+# Route-change convergence: TGW route-table changes take a few seconds to apply everywhere.
+# Reported as a note for every create / delete / replace / update of these types; never a block.
+convergence:
+  window: tgw_route_convergence_s
+  types:
+    - aws_ec2_transit_gateway_route_table_propagation
+    - aws_ec2_transit_gateway_route
+    - aws_ec2_transit_gateway_route_table_association
+  actions: [create, delete, replace, update]
+  message: >-
+    Expect a few seconds of mixed results while the TGW route tables converge. Measured
+    2026-11-23 (Test 4): after a propagation was removed, 14-20 % of requests still got through
+    in the first seconds before 0 %; after it was restored, 87-95 % got through in the first
+    seconds before 100 %.
+
+# Node rolls (EKS). Any update or replace of an aws_eks_node_group or its aws_launch_template,
+# or a change to the VPC CNI add-on's configuration_values, replaces every node one at a time.
+# Not a block on its own. In terraform/aws/eks the launch template tags carry a hash of the CNI
+# config, so a CNI change always rolls the nodes (EKS sets maxPods only at launch).
+node_roll:
+  types: [aws_eks_node_group, aws_launch_template]
+  actions: [update, replace]
+  addon:
+    addon_name: vpc-cni          # aws_eks_addon.vpc_cni, or the module's aws_eks_addon.this["vpc-cni"]
+    attribute: configuration_values
+  mode_label: cloudbridge.io/pod-ip-mode   # node group label, used when the add-on is not in the plan
+  message: >-
+    Node roll: all nodes replaced one at a time; workloads move; a drain can stall.
+  # Checked when the change moves pods onto prefix delegation, or changes where the /28s come
+  # from (custom networking on or off) with prefix delegation on after the apply.
+  prefix_delegation:
+    without_custom_networking:
+      id: prefix-delegation-in-node-subnets
+      blocks: true
+      message: >-
+        Prefix delegation without custom networking: pods take /28s from the node subnets;
+        check free aligned /28s first (signal subnet.free_aligned_28). Session 2: rollout failed
+        with PodEvictionFailure in /26s with 34-49 free IPs.
+    with_custom_networking:
+      id: prefix-delegation-in-pod-subnets
+      blocks: false
+      message: >-
+        Prefix delegation with custom networking: pods take /28s from the pod subnets named in
+        the ENIConfigs. Check that the ENIConfigs exist before the nodes roll, and that the pod
+        subnets have free aligned /28s. Session 2: the rollout succeeded in 12 min, 18 -> 204 pods.
+
+# Hazards: plan shapes AWS is known to reject at apply time. Every match is reported.
+hazards:
+  - id: sg-rule-multi-cidr-replace
+    match_type: aws_security_group_rule
+    actions: [replace]
+    check: cidr_blocks_grow        # cidr_blocks gains an entry and keeps at least one existing one
+    blocks: true
+    message: >-
+      Replace of a multi-CIDR rule: AWS rejects the new rule as a duplicate
+      (InvalidPermission.Duplicate); use one rule per CIDR. Session 2: adding the secondary VPC
+      CIDR to the EKS node security-group rule failed this way; the fix was one rule per CIDR,
+      moved with terraform state mv.

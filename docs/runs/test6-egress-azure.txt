@@ -1,0 +1,127 @@
+== Test 6 Part B, AKS egress through the hub firewall, 2026-11-23T21:04:51Z
+API server cloudbridge-aks-443gz54n.hcp.northcentralus.azmk8s.io, ACR cloudbridgeacf6be44.azurecr.io, node aks-system-18785589-vmss000000=True/KubeletReady 
+-- egress IP seen by the internet from an AKS pod (expect the firewall's public IP 52.237.162.171):
+52.237.162.171  -> exit 0
+
+
+== 0. Backup of the firewall config
+backup in /var/lib/cloudbridge/egress-backup: dnsmasq.d nftables.conf ruleset.nft 
+
+  [azfw stderr] # Warning: table ip security is managed by iptables-nft, do not touch!
+
+== 1. Baseline (allow-all)
+node time (UTC)       21:05:38
+API server /healthz   http 000   (any code = reachable, 000 = cut)
+ACR /v2/              http 401   (401 = reachable)
+pull mcr (pause:3.6)  ok
+pull docker.io        ok
+other site (bing)     http 200
+time sync (chrony):
+  Reference ID    : 50484330 (PHC0)
+  System time     : 0.000000732 seconds fast of NTP time
+  Leap status     : Normal
+  #* PHC0                          0   3   377     5  +1189ns[+1508ns] +/-  603ns
+kubelet errors talking to the API in the last 2 min: 0
+
+
+== 2. BLOCK everything from 10.20.0.0/20 to the internet (120 s)
+egress from 10.20.0.0/20 to the internet: BLOCKED
+
+  16:06:31 node: aks-system-18785589-vmss000000=True/KubeletReady 
+  16:06:51 node: aks-system-18785589-vmss000000=True/KubeletReady 
+  16:07:12 node: aks-system-18785589-vmss000000=Unknown/NodeStatusUnknown 
+  16:07:32 node: aks-system-18785589-vmss000000=Unknown/NodeStatusUnknown 
+  16:07:52 node: aks-system-18785589-vmss000000=Unknown/NodeStatusUnknown 
+  16:08:13 node: aks-system-18785589-vmss000000=Unknown/NodeStatusUnknown 
+-- on the node while blocked
+node time (UTC)       21:12:12
+API server /healthz   http 000   (any code = reachable, 000 = cut)
+ACR /v2/              http 000   (401 = reachable)
+pull mcr (pause:3.6)  FAIL
+pull docker.io        FAIL
+other site (bing)     http 000
+time sync (chrony):
+  Reference ID    : 50484330 (PHC0)
+  System time     : 0.000000002 seconds fast of NTP time
+  Leap status     : Normal
+  #* PHC0                          0   3   377     8  +6776ns[  -14us] +/- 1095ns
+kubelet errors talking to the API in the last 2 min: 103
+Nov 23 21:13:22 aks-system-18785589-vmss000000 kubelet[3578]: E1123 21:13:22.652938    3578 kubelet_node_status.go:474] "Error updating node status, will retry" err="failed to patch status \"{\\\"stat
+
+-- firewall
+  ct state invalid counter packets 109 bytes 13009 log prefix "fw-invalid " level info drop
+  ip saddr 10.20.0.0/20 ip daddr != 10.0.0.0/8 jump egress comment "cb-egress-jump"
+  ct status dnat counter packets 118 bytes 7340 accept
+  ip saddr 10.0.0.0/8 ct state new counter packets 5733 bytes 344538 accept
+  counter packets 0 bytes 0 log prefix "fw-drop " level info drop
+  egress: limit rate 20/second burst 5 packets counter packets 6144 bytes 387793 log prefix "fw-egress-deny " level info
+  egress: counter packets 13509 bytes 829761 drop
+  allow4 IPs: 0
+  fw-egress-deny log lines (last 10 min): 6148
+  e.g. SRC=10.20.0.4 DST=20.72.60.25 LEN=60 TOS=0x00 PREC=0x00 TTL=63 ID=19377 DF PROTO=TCP SPT=40022 DPT=443
+  e.g. SRC=10.20.0.4 DST=20.72.60.25 LEN=60 TOS=0x00 PREC=0x00 TTL=63 ID=20425 DF PROTO=TCP SPT=39950 DPT=443
+  e.g. SRC=10.20.0.4 DST=20.72.60.25 LEN=60 TOS=0x00 PREC=0x00 TTL=63 ID=44030 DF PROTO=TCP SPT=40018 DPT=443
+
+
+== 3. ALLOW only AKS's required FQDNs + cloudbridgeacf6be44.azurecr.io + blob.core.windows.net (ACR Basic layers) + NTP
+dnsmasq nftset: 1 line, 12 domains
+allow4 now holds 23 IPs
+
+  16:14:41 node: aks-system-18785589-vmss000000=True/KubeletReady 
+-- on the node with the allowlist
+node time (UTC)       21:14:51
+API server /healthz   http 000   (any code = reachable, 000 = cut)
+ACR /v2/              http 401   (401 = reachable)
+pull mcr (pause:3.6)  ok
+pull docker.io        FAIL
+other site (bing)     http 000
+time sync (chrony):
+  Reference ID    : 50484330 (PHC0)
+  System time     : 0.000000000 seconds fast of NTP time
+  Leap status     : Normal
+  #* PHC0                          0   3   377     7  -1562ns[  -13us] +/-  666ns
+kubelet errors talking to the API in the last 2 min: 61
+Nov 23 21:14:02 aks-system-18785589-vmss000000 kubelet[3578]: E1123 21:14:02.655167    3578 kubelet_node_status.go:474] "Error updating node status, will retry" err="error getting node \"aks-system-18
+
+-- Kubernetes view: a pod from ACR (pull Always) and one from Docker Hub
+POD           PHASE     STATE              IMAGE
+cb-pull-acr   Running   <none>             cloudbridgeacf6be44.azurecr.io/cloudbridge-app:v1
+cb-pull-hub   Pending   ImagePullBackOff   docker.io/library/busybox:1.36
+   expect cb-pull-acr Running, cb-pull-hub ErrImagePull/ImagePullBackOff (docker.io is not on the list)
+-- firewall: rule counters, allow4 size, recent denies
+  ct state invalid counter packets 109 bytes 13009 log prefix "fw-invalid " level info drop
+  ip saddr 10.20.0.0/20 ip daddr != 10.0.0.0/8 jump egress comment "cb-egress-jump"
+  ct status dnat counter packets 118 bytes 7340 accept
+  ip saddr 10.0.0.0/8 ct state new counter packets 5744 bytes 345175 accept
+  counter packets 0 bytes 0 log prefix "fw-drop " level info drop
+  egress: ip daddr @allow4 counter packets 324 bytes 19440 accept
+  egress: udp dport 123 counter packets 0 bytes 0 accept
+  egress: limit rate 20/second burst 5 packets counter packets 1387 bytes 83220 log prefix "fw-egress-deny " level info
+  egress: counter packets 4356 bytes 261360 drop
+  allow4 IPs: 23
+  fw-egress-deny log lines (last 10 min): 7570
+  e.g. SRC=10.20.0.4 DST=52.188.247.151 LEN=60 TOS=0x00 PREC=0x00 TTL=63 ID=48331 DF PROTO=TCP SPT=46762 DPT=443
+  e.g. SRC=10.20.0.4 DST=52.188.247.151 LEN=60 TOS=0x00 PREC=0x00 TTL=63 ID=42891 DF PROTO=TCP SPT=46748 DPT=443
+  e.g. SRC=10.20.0.4 DST=52.179.73.52 LEN=60 TOS=0x00 PREC=0x00 TTL=63 ID=4024 DF PROTO=TCP SPT=60302 DPT=443
+
+
+== RESTORE: allow-all egress on the Azure firewall
+dnsmasq.d identical to the backup
+ruleset identical to the backup: RESTORED
+
+  [azfw stderr] # Warning: table ip security is managed by iptables-nft, do not touch!
+-- after restore
+node time (UTC)       21:18:00
+API server /healthz   http 000   (any code = reachable, 000 = cut)
+ACR /v2/              http 401   (401 = reachable)
+pull mcr (pause:3.6)  ok
+pull docker.io        ok
+other site (bing)     http 200
+time sync (chrony):
+  Reference ID    : 50484330 (PHC0)
+  System time     : 0.000000947 seconds fast of NTP time
+  Leap status     : Normal
+  #* PHC0                          0   3   377     8  +4528ns[+5265ns] +/-  669ns
+kubelet errors talking to the API in the last 2 min: 10
+
+saved: ../docs/runs/test6-egress-azure.txt

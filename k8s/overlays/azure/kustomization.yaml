@@ -1,3 +1,5 @@
+# AKS: the frontend behind an internal LB (10.20.4.10), published by DNAT on the
+# hub firewall. Replaces v1's public LB (frontend-lb.yaml).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
@@ -7,7 +9,7 @@ images:
     newName: REGISTRY/cloudbridge-app  # filled in by k8s/deploy.sh from Terraform outputs
     newTag: v1
 patches:
-  - path: frontend-lb.yaml
+  - path: frontend-ilb.yaml
   # Set CLOUD=azure on both deployments (env index 1 in the base)
   - target: { kind: Deployment }
     patch: |-

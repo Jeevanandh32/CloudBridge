@@ -1,0 +1,151 @@
+== Test 6 Part B, EKS egress through fw-a / fw-b, 2026-11-23T21:25:35Z
+EKS sources: 10.10.0.0/26, 10.10.0.64/26, 10.10.64.0/18
+
+== 1. Baseline (allow-all)
+-- egress IP (expect fw-a or fw-b's public IP: 3.15.192.97 3.17.133.164)
+3.17.133.164
+  -> exit 0
+-- https://www.example.com (443)
+200
+  -> exit 0
+-- https://www.wikipedia.org (443, any site)
+200
+  -> exit 0
+-- http://example.com (80)
+200
+  -> exit 0
+-- ping 1.1.1.1 (ICMP)
+PING 1.1.1.1 (1.1.1.1) 56(84) bytes of data.
+64 bytes from 1.1.1.1: icmp_seq=1 ttl=54 time=1.56 ms
+64 bytes from 1.1.1.1: icmp_seq=2 ttl=54 time=1.32 ms
+
+--- 1.1.1.1 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1002ms
+rtt min/avg/max/mdev = 1.321/1.441/1.561/0.120 ms
+  -> exit 0
+-- DNS to a public resolver (udp 53)
+104.20.23.154
+172.66.147.243
+  -> exit 0
+-- github.com:22 (ssh, git over ssh)
+Connection to github.com (140.82.113.3) 22 port [tcp/ssh] succeeded!
+  -> exit 0
+-- NTP time.google.com udp 123 (48 = reply)
+48
+  -> exit 0
+-- in-VPC DNS (VPC resolver, never via the firewall)
+98.87.170.71
+98.87.170.74
+98.82.161.185
+  -> exit 0
+
+== 2. Port-based control: only TCP 443 and UDP 123 from the EKS subnets
+-- fw-a
+egress from 10.10.0.0/26, 10.10.0.64/26, 10.10.64.0/18: only tcp/443 udp/123
+
+-- fw-b
+egress from 10.10.0.0/26, 10.10.0.64/26, 10.10.64.0/18: only tcp/443 udp/123
+
+-- egress IP (expect fw-a or fw-b's public IP: 3.15.192.97 3.17.133.164)
+3.17.133.164
+  -> exit 0
+-- https://www.example.com (443)
+200
+  -> exit 0
+-- https://www.wikipedia.org (443, any site)
+200
+  -> exit 0
+-- http://example.com (80)
+000
+command terminated with exit code 28
+  -> exit 28
+-- ping 1.1.1.1 (ICMP)
+PING 1.1.1.1 (1.1.1.1) 56(84) bytes of data.
+
+--- 1.1.1.1 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1024ms
+
+command terminated with exit code 1
+  -> exit 1
+-- DNS to a public resolver (udp 53)
+;; communications error to 1.1.1.1#53: timed out
+;; no servers could be reached
+
+command terminated with exit code 9
+  -> exit 9
+-- github.com:22 (ssh, git over ssh)
+nc: connect to github.com (140.82.113.3) port 22 (tcp) timed out: Operation in progress
+command terminated with exit code 1
+  -> exit 1
+-- NTP time.google.com udp 123 (48 = reply)
+48
+  -> exit 0
+-- in-VPC DNS (VPC resolver, never via the firewall)
+98.82.161.185
+98.87.170.71
+98.87.170.74
+  -> exit 0
+
+-- Kubernetes still works: image pulls are HTTPS (ECR API/DKR on 443, layers via the S3 gateway endpoint)
+POD           PHASE     WAITING
+cb-pull-hub   Running   <none>
+NODE                                        READY
+ip-10-10-0-111.us-east-2.compute.internal   True
+ip-10-10-0-15.us-east-2.compute.internal    True
+
+-- firewall counters and denied flows
+-- fw-a
+  ct state invalid counter packets 0 bytes 0 log prefix "fw-invalid " level info drop
+  ip saddr { 10.10.0.0/25, 10.10.64.0/18 } ip daddr != 10.0.0.0/8 jump egress comment "cb-egress-jump"
+  ip saddr 10.0.0.0/8 ct state new counter packets 2509 bytes 182484 accept
+  counter packets 0 bytes 0 log prefix "fw-drop " level info drop
+  egress: tcp dport 443 counter packets 2 bytes 120 accept
+  egress: udp dport 123 counter packets 4 bytes 304 accept
+  egress: limit rate 20/second burst 5 packets counter packets 0 bytes 0 log prefix "fw-egress-deny " level info
+  egress: counter packets 0 bytes 0 drop
+  allow4 IPs: 0
+  fw-egress-deny log lines (last 10 min): 0
+
+-- fw-b
+  ct state invalid counter packets 0 bytes 0 log prefix "fw-invalid " level info drop
+  ip saddr { 10.10.0.0/25, 10.10.64.0/18 } ip daddr != 10.0.0.0/8 jump egress comment "cb-egress-jump"
+  ip saddr 10.0.0.0/8 ct state new counter packets 1471 bytes 96272 accept
+  counter packets 0 bytes 0 log prefix "fw-drop " level info drop
+  egress: tcp dport 443 counter packets 3 bytes 180 accept
+  egress: udp dport 123 counter packets 5 bytes 380 accept
+  egress: limit rate 20/second burst 5 packets counter packets 13 bytes 848 log prefix "fw-egress-deny " level info
+  egress: counter packets 13 bytes 848 drop
+  allow4 IPs: 0
+  fw-egress-deny log lines (last 10 min): 13
+  e.g. SRC=10.10.0.111 DST=140.82.113.3 LEN=60 TOS=0x00 PREC=0x00 TTL=124 ID=43644 DF PROTO=TCP SPT=20635 DPT=22
+  e.g. SRC=10.10.0.111 DST=140.82.113.3 LEN=60 TOS=0x00 PREC=0x00 TTL=124 ID=43645 DF PROTO=TCP SPT=20635 DPT=22
+  e.g. SRC=10.10.0.111 DST=140.82.113.3 LEN=60 TOS=0x00 PREC=0x00 TTL=124 ID=43646 DF PROTO=TCP SPT=20635 DPT=22
+
+
+What this shows:
+  * Port rules stop plain HTTP, ICMP, public DNS and SSH, but anything on 443 still gets out:
+  wikipedia.org works exactly like a required endpoint, and so would a tunnel, a DNS-over-HTTPS
+  resolver or a paste site. A port says nothing about the destination.
+  * Nothing on the EKS side broke: DNS uses the VPC resolver (10.10.0.2), time uses the Amazon
+  Time Sync Service (169.254.169.123), the API server is reached on its private endpoint, and
+  image pulls are HTTPS. Neither DNS nor NTP touches the firewall.
+  * Production does destination-based control instead:
+    - AWS Network Firewall stateful domain-list rules (allowlist on the TLS SNI / HTTP Host),
+      with TLS inspection if the SNI can't be trusted, or an explicit proxy;
+    - VPC interface endpoints (ECR api/dkr, STS, EC2, logs ...) and the S3 gateway endpoint,
+      so AWS API traffic never needs the internet path at all.
+  The Azure test does the FQDN version with dnsmasq + nftables sets: allow by the name that
+  was resolved, not by port.
+
+== RESTORE: allow-all egress on cloudbridge-fw-a
+dnsmasq.d identical to the backup
+ruleset identical to the backup: RESTORED
+
+== RESTORE: allow-all egress on cloudbridge-fw-b
+dnsmasq.d identical to the backup
+ruleset identical to the backup: RESTORED
+
+-- after restore
+200
+  -> exit 0
+saved: ../docs/runs/test6-egress-aws.txt

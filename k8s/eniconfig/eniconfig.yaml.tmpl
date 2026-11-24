@@ -1,0 +1,15 @@
+# VPC CNI custom networking (Test 5, fix 2): pods get IPs from the secondary-CIDR pod subnets
+# (10.10.64.0/19 in 2a, 10.10.96.0/19 in 2b) instead of the /26 node subnets.
+# One ENIConfig per AZ. The name must be the AZ: the CNI picks the ENIConfig named by the
+# node's topology.kubernetes.io/zone label (ENI_CONFIG_LABEL_DEF, set in terraform/aws/eks).
+# The security group is the EKS node SG, so pod ENIs get the same rules as nodes
+# (ingress from 10.20.0.0/16 and the spoke CIDRs).
+# Rendered by render.sh, once per AZ: __AZ__, __SUBNET_ID__ and __NODE_SG__ are replaced.
+apiVersion: crd.k8s.amazonaws.com/v1alpha1
+kind: ENIConfig
+metadata:
+  name: __AZ__
+spec:
+  subnet: __SUBNET_ID__
+  securityGroups:
+    - __NODE_SG__

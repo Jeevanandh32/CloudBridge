@@ -1,0 +1,51 @@
+== Test 6 inbound: why AKS ingress is DNAT on the firewall, 2026-11-23T21:27:34Z
+The problem (documented by Microsoft for AKS with outboundType userDefinedRouting):
+  A public LoadBalancer Service puts a public IP on the Azure LB in front of the nodes. A user's
+  SYN arrives at the node straight from that LB, never touching the firewall. The node's reply
+  (SYN-ACK to the user's internet IP) follows the subnet's UDR 0.0.0.0/0 -> firewall. The
+  firewall never saw the SYN: conntrack marks the SYN-ACK INVALID and nftables drops it
+  (fw-invalid). Even a stateless firewall would SNAT it to its own public IP, and the user
+  would get a reply from the wrong address and reset it. Result: the LB IP never answers.
+The fix used here: no public IP on AKS at all. Users hit the firewall's public IP; the
+firewall DNATs to the internal LB 10.20.4.10, so the request and the reply both pass through
+it and conntrack un-DNATs the reply. Same path in, same path out.
+Demonstrating the broken case needs a 4th public IP, and the subscription allows 3 (2 VPN
+gateway + firewall), so this is a documented check of the working path instead.
+
+firewall public IP 52.237.162.171, this client 73.249.174.243
+capture started for 73.249.174.243
+
+  curl 1: http 200 in 0.098282s
+  curl 2: http 200 in 0.094647s
+  curl 3: http 200 in 0.114083s
+  curl 4: http 200 in 0.107293s
+  curl 5: http 200 in 0.123777s
+-- tcpdump on the firewall NIC, host 73.249.174.243 (one request = 4 legs: in, DNAT out, reply in, reply out)
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on eth0, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+21:28:06.478203 IP 73.249.174.243.57275 > 10.20.241.4.80: Flags [SEW], seq 1062997677, win 65535, options [mss 1460,nop,wscale 6,nop,nop,TS val 962506
+21:28:06.480855 IP 10.20.241.4.80 > 73.249.174.243.57275: Flags [S.E], seq 1989078653, ack 1062997678, win 65160, options [mss 1410,sackOK,TS val 3088
+21:28:06.518271 IP 73.249.174.243.57275 > 10.20.241.4.80: Flags [.], ack 1, win 2067, options [nop,nop,TS val 962506289 ecr 308846500], length 0
+21:28:06.527133 IP 73.249.174.243.57275 > 10.20.241.4.80: Flags [P.], seq 1:84, ack 1, win 2067, options [nop,nop,TS val 962506290 ecr 308846500], len
+21:28:06.527466 IP 10.20.241.4.80 > 73.249.174.243.57275: Flags [.], ack 84, win 509, options [nop,nop,TS val 308846548 ecr 962506290], length 0
+21:28:06.537988 IP 10.20.241.4.80 > 73.249.174.243.57275: Flags [P.], seq 1:126, ack 84, win 509, options [nop,nop,TS val 308846558 ecr 962506290], le
+21:28:06.537992 IP 10.20.241.4.80 > 73.249.174.243.57275: Flags [P.], seq 126:157, ack 84, win 509, options [nop,nop,TS val 308846558 ecr 962506290], 
+21:28:06.592901 IP 73.249.174.243.57275 > 10.20.241.4.80: Flags [.], ack 157, win 2065, options [nop,nop,TS val 962506349 ecr 308846558], length 0
+21:28:06.592901 IP 73.249.174.243.57275 > 10.20.241.4.80: Flags [F.], seq 84, ack 157, win 2065, options [nop,nop,TS val 962506349 ecr 308846558], len
+21:28:06.593160 IP 10.20.241.4.80 > 73.249.174.243.57275: Flags [F.], seq 157, ack 85, win 509, options [nop,nop,TS val 308846613 ecr 962506349], leng
+21:28:06.632833 IP 73.249.174.243.57275 > 10.20.241.4.80: Flags [.], ack 158, win 2065, options [nop,nop,TS val 962506402 ecr 308846613], length 0
+21:28:07.611997 IP 73.249.174.243.57280 > 10.20.241.4.80: Flags [SEW], seq 2540368925, win 65535, options [mss 1460,nop,wscale 6,nop,nop,TS val 367850
+21:28:07.613127 IP 10.20.241.4.80 > 73.249.174.243.57280: Flags [S.E], seq 1848758410, ack 2540368926, win 65160, options [mss 1410,sackOK,TS val 8251
+21:28:07.652342 IP 73.249.174.243.57280 > 10.20.241.4.80: Flags [.], ack 1, win 2067, options [nop,nop,TS val 3678508388 ecr 825151085], length 0
+-- conntrack entries for 73.249.174.243 (original direction, then reply direction)
+tcp 6 118 TIME_WAIT src=73.249.174.243 dst=10.20.241.4 sport=57275 dport=80 src=10.20.4.10 dst=10.20.241.4 sport=80 dport=57275 [ASSURED] mark=0 use=1
+tcp 6 119 TIME_WAIT src=73.249.174.243 dst=10.20.241.4 sport=57280 dport=80 src=10.20.4.10 dst=10.20.241.4 sport=80 dport=57280 [ASSURED] mark=0 use=1
+tcp 6 118 TIME_WAIT src=73.249.174.243 dst=10.20.241.4 sport=57281 dport=80 src=10.20.4.10 dst=10.20.241.4 sport=80 dport=57281 [ASSURED] mark=0 use=1
+tcp 6 119 TIME_WAIT src=73.249.174.243 dst=10.20.241.4 sport=57282 dport=80 src=10.20.4.10 dst=10.20.241.4 sport=80 dport=57282 [ASSURED] mark=0 use=1
+tcp 6 118 TIME_WAIT src=73.249.174.243 dst=10.20.241.4 sport=57283 dport=80 src=10.20.4.10 dst=10.20.241.4 sport=80 dport=57283 [ASSURED] mark=0 use=1
+   [ASSURED] = this firewall saw packets in both directions
+-- nft counters
+  ip daddr 10.20.241.4 ip saddr != 10.0.0.0/8 tcp dport 80 counter packets 45 bytes 2624 dnat to 10.20.4.10:80
+  ct state invalid counter packets 109 bytes 13009 log prefix "fw-invalid " level info drop
+  ct status dnat counter packets 127 bytes 7872 accept
+

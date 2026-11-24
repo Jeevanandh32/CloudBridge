@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars (git-ignored) and fill in.
+
+# Required: who may reach the public EKS API endpoint. Your laptop's public IP as a /32:
+#   curl -s https://checkip.amazonaws.com
+admin_cidrs = ["<YOUR_PUBLIC_IP>/32"]
+
+# Test 5 switches. Each flip rolls the Spot node group (new nodes pick up the new max-pods).
+# enable_prefix_delegation = true   # fix 1: ENI limit (17 -> 110 pods per node)
+# enable_custom_networking = true   # fix 2: needs aws/spoke-app enable_secondary_cidr = true
+#                                   #        and the k8s/eniconfig/ ENIConfigs applied first

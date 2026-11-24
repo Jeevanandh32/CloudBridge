@@ -1,0 +1,51 @@
+epoch_ms,phase,bgp_peers,az_connections,aws_tunnels
+1795455164889,baseline,10.20.240.4=Connected 10.20.240.4=Unknown 10.20.240.5=Connected 10.20.240.5=Unknown 169.254.21.1=Connected 169.254.21.1=Connecting 169.254.21.5=Connected 169.254.21.5=Connecting 169.254.22.1=Connected 169.254.22.1=Connecting 169.254.22.5=Connected 169.254.22.5=Connecting ,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455182889,baseline,10.20.240.4=Connected 10.20.240.4=Unknown 10.20.240.5=Connected 10.20.240.5=Unknown 169.254.21.1=Connected 169.254.21.1=Connecting 169.254.21.5=Connected 169.254.21.5=Connecting 169.254.22.1=Connected 169.254.22.1=Connecting 169.254.22.5=Connected 169.254.22.5=Connecting ,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455200792,baseline,10.20.240.4=Connected 10.20.240.4=Unknown 10.20.240.5=Connected 10.20.240.5=Unknown 169.254.21.1=Connected 169.254.21.1=Connecting 169.254.21.5=Connected 169.254.21.5=Connecting 169.254.22.1=Connected 169.254.22.1=Connecting 169.254.22.5=Connected 169.254.22.5=Connecting ,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455218272,baseline,10.20.240.4=Connected 10.20.240.4=Unknown 10.20.240.5=Connected 10.20.240.5=Unknown 169.254.21.1=Connected 169.254.21.1=Connecting 169.254.21.5=Connected 169.254.21.5=Connecting 169.254.22.1=Connected 169.254.22.1=Connecting 169.254.22.5=Connected 169.254.22.5=Connecting ,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455235766,baseline,10.20.240.4=Connected 10.20.240.4=Unknown 10.20.240.5=Connected 10.20.240.5=Unknown 169.254.21.1=Connected 169.254.21.1=Connecting 169.254.21.5=Connected 169.254.21.5=Connecting 169.254.22.1=Connected 169.254.22.1=Connecting 169.254.22.5=Connected 169.254.22.5=Connecting ,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455254650,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455262989,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455270751,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455278604,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455285923,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455293768,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455301680,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455310389,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455318341,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455331339,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455339496,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455347340,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455355162,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+1795455363047,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455370959,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455378806,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455387168,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455395035,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455402406,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455410215,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455418066,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455425839,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455433583,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455441391,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455449227,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455456617,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455464000,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455471351,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455479067,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455486355,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455494134,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455501391,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455509264,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455517040,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455524798,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455532649,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455539952,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455547754,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455555555,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455563297,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455648132,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455724111,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455808999,reset,,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455894214,reset,10.20.240.4=Unknown 10.20.240.5=Connecting 169.254.21.1=Connecting 169.254.21.5=Connected 169.254.22.1=Connecting 169.254.22.5=Connected ,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 
+1795455973254,reset,10.20.240.4=Connected 10.20.240.4=Unknown 10.20.240.5=Connected 10.20.240.5=Unknown 169.254.21.1=Connecting 169.254.21.5=Connected 169.254.21.5=Connecting 169.254.22.1=Connecting 169.254.22.5=Connected 169.254.22.5=Connecting ,c0-t1=None c0-t2=None c1-t1=None c1-t2=None ,c0-t1=DOWN/0 c0-t2=DOWN/0 c1-t1=UP/2 c1-t2=UP/2 

@@ -1,0 +1,3 @@
+RESULT 10.10.0.10 ok=29 total=200 pct=14.5 exit_codes: 0=29 28=171
+RESULT 10.10.0.74 ok=39 total=200 pct=19.5 exit_codes: 0=39 28=161
+

@@ -1,0 +1,52 @@
+baseline: AWS tunnels UP 4/4, Azure connections 0/4, BGP peers 0/4, Azure learned eBGP routes 8, TGW inspection table 10.20.0.0/20x4;10.20.240.0/22x4
+== After the break (samples every ~15 s; each value is the sample's start time)
+  first AWS tunnel DOWN                          break + 53 s
+  all 4 AWS tunnels DOWN                         break + 98 s
+  all 4 Azure connections not Connected          break + 53 s
+  all 4 BGP peers down (Azure)                   break + 53 s
+  Azure withdrew AWS routes (learned eBGP = 0)   break + 53 s
+  TGW withdrew Azure routes (inspection table)   break + 53 s
+  cloudbridge-vpn-link-down = ALARM              break + 383 s
+  cloudbridge-bgp-peer-down Fired (Azure)        break + 53 s
+== After the PSK fix (ref = when you pressed Enter, i.e. the apply had finished; negative = during the apply)
+  all 4 AWS tunnels UP                           fixed + 69 s
+  all 4 BGP peers Connected (Azure)              not seen
+  Azure learned eBGP routes back to baseline     fixed + 1 s
+  TGW inspection table back to baseline          fixed + 84 s
+  cloudbridge-vpn-link-down = OK                 fixed + 25 s
+  cloudbridge-bgp-peer-down Resolved             not seen
+
+== Users (probe: 1 req/s, fresh DNS through 1.1.1.1)
+primary cloud          : aws
+requests after break   : 858
+failed requests        : 55 (6.4%)
+first failure          : 0.6 s after break
+served by standby      : 41.7 s after break  <- failover time
+user-visible outage    : 41.0 s
+failback to aws        : 15.7 s after restore
+failed during failback : 1
+== Each provider on its own (direct query each second, no resolver cache)
+  Route 53 (failover records)          answers Azure at break + 40.6 s
+  Route 53 (failover records)          answers AWS again at restore + 37.5 s
+  Traffic Manager (behind Azure DNS)   never answered Azure
+  Traffic Manager (behind Azure DNS)   answers AWS again at restore + 12.5 s
+
+== CloudWatch alarm history since 2026-11-23T22:59:05Z (exact state-change times)
+  2026-11-23T18:05:31.550000-05:00	cloudbridge-vpn-c0-degraded	Alarm updated from OK to ALARM
+  2026-11-23T18:05:41.771000-05:00	cloudbridge-vpn-c1-degraded	Alarm updated from OK to ALARM
+  2026-11-23T18:10:04.467000-05:00	cloudbridge-vpn-c1-down	Alarm updated from OK to ALARM
+  2026-11-23T18:10:14.920000-05:00	cloudbridge-vpn-link-down	Alarm updated from OK to ALARM
+  2026-11-23T18:10:50.663000-05:00	cloudbridge-vpn-c0-down	Alarm updated from OK to ALARM
+  2026-11-23T18:19:14.920000-05:00	cloudbridge-vpn-link-down	Alarm updated from ALARM to OK
+  2026-11-23T18:19:50.666000-05:00	cloudbridge-vpn-c0-down	Alarm updated from ALARM to OK
+  2026-11-23T18:20:04.473000-05:00	cloudbridge-vpn-c1-down	Alarm updated from ALARM to OK
+  2026-11-23T18:24:31.550000-05:00	cloudbridge-vpn-c0-degraded	Alarm updated from ALARM to OK
+  2026-11-23T18:24:41.771000-05:00	cloudbridge-vpn-c1-degraded	Alarm updated from ALARM to OK
+== Azure Monitor alert cloudbridge-bgp-peer-down
+  fired 2026-11-23T17:08:47.4891645Z	Resolved	2026-11-23T17:47:15.4417874Z
+  fired 2026-11-23T17:08:50.1845442Z	Resolved	2026-11-23T17:47:14.3424759Z
+  fired 2026-11-23T17:09:51.3731605Z	Fired	None
+  fired 2026-11-23T17:09:54.8653611Z	Fired	None
+  fired 2026-11-23T17:50:05.239853Z	Fired	None
+  fired 2026-11-23T17:50:09.3609883Z	Fired	None
+== Azure Activity Log: shared-key writes (the break, then the terraform fix)

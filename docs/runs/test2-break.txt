@@ -1,0 +1,10 @@
+baseline: AWS tunnels UP 4/4, Azure connections 0/4, BGP peers 0/4, Azure learned eBGP routes 8, TGW inspection table 10.20.0.0/20x4;10.20.240.0/22x4
+== After the break (samples every ~15 s; each value is the sample's start time)
+  first AWS tunnel DOWN                          break + 53 s
+  all 4 AWS tunnels DOWN                         break + 98 s
+  all 4 Azure connections not Connected          break + 53 s
+  all 4 BGP peers down (Azure)                   break + 53 s
+  Azure withdrew AWS routes (learned eBGP = 0)   break + 53 s
+  TGW withdrew Azure routes (inspection table)   break + 53 s
+  cloudbridge-vpn-link-down = ALARM              break + 383 s
+  cloudbridge-bgp-peer-down Fired (Azure)        break + 53 s

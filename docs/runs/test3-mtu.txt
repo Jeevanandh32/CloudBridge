@@ -1,0 +1,44 @@
+== Configured MSS clamp (nftables 'mss' chain)
+-- AWS fw-a
+		ip daddr 10.20.0.0/16 tcp flags syn tcp option maxseg size set 1360
+		ip saddr 10.20.0.0/16 tcp flags syn tcp option maxseg size set 1360
+
+-- Azure fw
+		ip daddr 10.10.0.0/16 tcp flags syn tcp option maxseg size set 1360
+		ip saddr 10.10.0.0/16 tcp flags syn tcp option maxseg size set 1360
+
+
+== Path MTU, Azure fw -> 10.10.0.10
+local MTU: eth0: 1500
+largest DF payload to 10.10.0.10: 1394  =>  path MTU 1422
+one byte more:
+--- 10.10.0.10 ping statistics ---
+1 packets transmitted, 0 received, 100% packet loss, time 0ms
+tracepath:
+ 2:  10.10.240.40                                         19.232ms asymm  3 
+ 3:  no reply
+ 4:  10.10.0.10                                           18.994ms reached
+     Resume: pmtu 1500 hops 4 back 5 
+
+
+== Path MTU, 10.10.0.10 -> Azure fw
+local MTU: ens5: 9001
+largest DF payload to 10.20.241.4: 1394  =>  path MTU 1422
+one byte more:
+ping: local error: message too long, mtu=1422
+--- 10.20.241.4 ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+tracepath:
+ 4:  169.254.3.2                                          18.871ms asymm  5 
+ 5:  169.254.3.1                                           2.158ms pmtu 1422
+ 5:  10.20.241.4                                          20.018ms reached
+     Resume: pmtu 1422 hops 5 back 4 
+
+
+== TCP MSS, Azure -> AWS: SYN as sent by the Azure fw vs as received by host-a
+sent by Azure fw   : mss 1460
+received at host-a : mss 1350
+
+== TCP MSS, AWS -> Azure: SYN as sent by host-a vs as received by the Azure fw (TCP DNS, port 53)
+sent by host-a     : mss 1220
+received at Azure fw: mss 1170

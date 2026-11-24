@@ -1,0 +1,5 @@
+label,step,time,running,unscheduled,scheduled_no_ip,pods_per_node,free_ips_per_subnet,first_stuck
+secondary-ip,10,2026-11-23T20:31:54Z,10,0,0,ip-10-10-0-19=13;ip-10-10-0-99=13,node-a=39;node-b=40,""
+secondary-ip,20,2026-11-23T20:32:18Z,18,2,0,ip-10-10-0-19=17;ip-10-10-0-99=17,node-a=39;node-b=40,"Pending (unschedulable) pause-85597cfc4b-527b5: FailedScheduling: 0/2 nodes are available: 2 Too many pods. no new claims to deallocate; preemption: 0/2 nodes are available: 2 No preemption victims found for incoming pod. "
+secondary-ip,30,2026-11-23T20:32:42Z,18,12,0,ip-10-10-0-19=17;ip-10-10-0-99=17,node-a=39;node-b=40,"Pending (unschedulable) pause-85597cfc4b-2rnk6: FailedScheduling: 0/2 nodes are available: 2 Too many pods. no new claims to deallocate; preemption: 0/2 nodes are available: 2 No preemption victims found for incoming pod. "
+secondary-ip,40,2026-11-23T20:33:05Z,18,22,0,ip-10-10-0-19=17;ip-10-10-0-99=17,node-a=39;node-b=40,"Pending (unschedulable) pause-85597cfc4b-2rnk6: FailedScheduling: 0/2 nodes are available: 2 Too many pods. no new claims to deallocate; preemption: 0/2 nodes are available: 2 No preemption victims found for incoming pod. "

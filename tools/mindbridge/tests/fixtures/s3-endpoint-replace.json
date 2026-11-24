@@ -1,0 +1,50 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.10.5",
+  "resource_changes": [
+    {
+      "address": "aws_vpc_endpoint.s3_interface",
+      "mode": "managed",
+      "type": "aws_vpc_endpoint",
+      "name": "s3_interface",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "delete",
+          "create"
+        ],
+        "before": {
+          "id": "vpce-0s3",
+          "vpc_endpoint_type": "Interface",
+          "service_name": "com.amazonaws.us-east-2.s3",
+          "subnet_ids": [
+            "subnet-0nodea"
+          ],
+          "private_dns_enabled": false
+        },
+        "after": {
+          "id": null,
+          "vpc_endpoint_type": "Interface",
+          "service_name": "com.amazonaws.us-east-2.s3",
+          "subnet_ids": [
+            "subnet-0nodea"
+          ],
+          "private_dns_enabled": false
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {},
+        "replace_paths": [
+          [
+            "service_name"
+          ]
+        ]
+      },
+      "action_reason": "replace_because_cannot_update"
+    }
+  ],
+  "configuration": {},
+  "planned_values": {}
+}

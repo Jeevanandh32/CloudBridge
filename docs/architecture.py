@@ -1,12 +1,18 @@
 """CloudBridge architecture diagram, hand-placed on a grid, with official AWS / Azure icons.
 
-Layout: users and Route 53 on the left (middle), AWS on top, Azure at the bottom, and the
-site-to-site VPN between them. Icons come from the `diagrams` package (official icon sets)
-and are embedded, so the SVG is self-contained.
+Layout:
+- Left: users, the two DNS providers, and MindBridge AI.
+- Top: AWS hub-and-spoke (inspection VPC + Transit Gateway + app spoke).
+- Middle: the 4-tunnel VPN.
+- Bottom: the Azure hub VNet peered to the AKS spoke.
+
+Icons come from the `diagrams` package (official icon sets) and are embedded, so the SVG is
+self-contained.
 
 Regenerate:
     pip install diagrams
     cd docs && python3 architecture.py        -> architecture.svg
+    rsvg-convert -z 2 architecture.svg -o architecture.png
 """
 
 import base64
@@ -17,12 +23,12 @@ import diagrams
 ICONS = pathlib.Path(diagrams.__file__).parent.parent / "resources"
 OUT = pathlib.Path(__file__).with_name("architecture.svg")
 
-W, H = 1800, 1140
-AWS, AZURE, VPN, GREY = "#ff9900", "#0078d4", "#16191f", "#545b64"
+W, H = 1900, 1275
+AWS, AZURE, VPN, GREY, FW = "#ff9900", "#0078d4", "#16191f", "#545b64", "#c7254e"
 parts = []
 
 
-def icon(path, cx, cy, label, size=64):
+def icon(path, cx, cy, label, size=60):
     data = base64.b64encode((ICONS / f"{path}.png").read_bytes()).decode()
     half = size // 2
     parts.append(f'<image href="data:image/png;base64,{data}" x="{cx - half}" y="{cy - half}" '
@@ -47,91 +53,99 @@ def arrow(d, color, label=None, at=None, dashed=False, width=2, head=True):
         parts.append(f'<text x="{at[0]}" y="{at[1]}" class="e" fill="{color}">{label}</text>')
 
 
-# ---------------- Left: users and global DNS ----------------
-icon("onprem/client/users", 100, 580, "Users\n1 req/s probe")
-icon("aws/network/route-53", 290, 580, "Route 53\napp.jeevs.click\nhealth checks /health\n10 s × 3")
-arrow("M 135 580 L 250 580", GREY)
+def note(x, y, text, cls="n"):
+    for i, line in enumerate(text.split("\n")):
+        parts.append(f'<text x="{x}" y="{y + i * 15}" class="{cls}">{line}</text>')
+
+
+# ---------------- Left: users, DNS (two providers), MindBridge AI ----------------
+icon("onprem/client/users", 80, 610, "Users\napp.jeevs.click")
+
+box(170, 300, 260, 600, "DNS · 2 providers (no SPOF)", GREY, "#fafafa", bold=True)
+icon("aws/network/route-53", 300, 400, "Route 53\nfailover records\nhealth checks 10 s × 3")
+icon("azure/network/dns-zones", 300, 590, "Azure DNS\napp → CNAME")
+icon("azure/network/traffic-manager-profiles", 300, 760, "Traffic Manager\npriority · /health 10 s\nTTL 30")
+arrow("M 300 640 L 300 718", AZURE, width=1.5)
+note(185, 865, "Registrar NS: 2 Route 53 + 2 Azure\nRoute 53 unreachable → Azure answers")
+arrow("M 112 600 L 262 410", GREY, width=1.5)
+arrow("M 112 615 L 262 590", GREY, width=1.5)
+
+box(40, 940, 390, 250, "MindBridge AI · laptop · read-only", "#6f42c1", "#f7f2ff", bold=True)
+icon("programming/language/python", 110, 1020, "precheck\nwhat-if · predict", size=52)
+note(175, 1000, "Blocks risky terraform plans\n(stopped both Test 4 breaks)\nN-1 what-if: single points of failure\nPredict: warned 9–14 min before\nloss crossed 5 %, 0 false alarms\nReads AWS/Azure APIs, SSM,\nrun-command, kubectl", "nm")
 
 # ---------------- AWS (top) ----------------
-box(420, 60, 1340, 440, "AWS · us-east-2 (Ohio)", AWS, "#fff7eb", bold=True)
-box(440, 95, 1000, 385, "VPC 10.10.0.0/16 · 2 AZs", AWS)
-box(460, 130, 200, 330, "Public subnets /24 ×2", "#8c4fff", "#f6f2ff")
-icon("aws/network/internet-gateway", 560, 180, "Internet gateway")
-icon("aws/network/elb-application-load-balancer", 560, 290, "ALB (public)\nIP targets · HC /live")
-icon("aws/network/nat-gateway", 560, 392, "NAT gateway\nsingle (cost)")
+box(470, 60, 1400, 480, "AWS · us-east-2 (Ohio) · hub and spoke", AWS, "#fff7eb", bold=True)
 
-box(680, 130, 740, 330, "Private subnets /19 ×2 · EKS 1.35 · 2 × t3.medium · VPC CNI", "#8c4fff", "#f6f2ff")
-icon("k8s/compute/pod", 770, 230, "frontend ×3")
-icon("aws/network/elb-network-load-balancer", 990, 230, "NLB (internal)")
-icon("k8s/compute/pod", 1210, 230, "backend ×3")
-icon("aws/network/route-53-hosted-zone", 1350, 230, "Private zone\ncloudbridge.internal")
-icon("aws/compute/elastic-kubernetes-service", 770, 370, "EKS control plane")
-icon("aws/compute/ec2", 990, 370, "Managed node group\n2 × t3.medium")
+box(490, 95, 440, 420, "Inspection VPC 10.10.240.0/24 · 2 AZs", AWS)
+icon("aws/network/internet-gateway", 710, 150, "", size=50)
+note(745, 155, "Internet gateway", "nm")
+icon("aws/compute/ec2", 600, 290, "fw-a · 2a\nnftables · NAT\nMSS clamp · dnsmasq")
+icon("aws/compute/ec2", 820, 290, "fw-b · 2b\nnftables · NAT\nMSS clamp · dnsmasq")
+icon("aws/storage/simple-storage-service-s3", 710, 445, "Flow logs → S3", size=46)
+arrow("M 610 255 L 688 176", FW, width=1.5)
+arrow("M 810 255 L 732 176", FW, width=1.5)
 
-box(1460, 95, 280, 385, "Supporting services", GREY, "#ffffff", dash=True)
-icon("aws/compute/ec2-container-registry", 1600, 165, "ECR\napp image")
-icon("aws/security/identity-and-access-management-iam-role", 1600, 280, "IAM role\nLB Controller (Pod Identity)")
-icon("aws/storage/simple-storage-service-s3", 1600, 395, "S3\nTerraform state")
+icon("aws/network/transit-gateway", 1030, 430, "Transit Gateway\nASN 64512 · ECMP\nspokes / vpn / inspection RTs", size=64)
+arrow("M 990 420 L 860 320", FW, width=2)
+arrow("M 990 435 L 640 320", FW, width=2)
 
-# AWS request path
-arrow("M 592 290 L 730 230", AWS)                                    # ALB -> frontend
-arrow("M 805 230 L 950 230", AWS)                                    # frontend -> NLB
-arrow("M 1025 230 L 1170 230", AWS)                                  # NLB -> backend
-arrow("M 770 196 C 770 172, 1350 172, 1350 192", AWS, "resolves backend.cloudbridge.internal",
-      (1060, 176), dashed=True, width=1.5)
+box(1110, 95, 740, 420, "App spoke VPC 10.10.0.0/20 · pods 10.10.64.0/18", AWS)
+icon("aws/network/elb-application-load-balancer", 1190, 190, "ALB (public)\nIP targets")
+icon("k8s/compute/pod", 1370, 190, "frontend ×3")
+icon("k8s/compute/pod", 1530, 190, "backend ×3")
+icon("aws/network/privatelink", 1740, 190, "S3 interface endpoint\n(PrivateLink, 1 AZ)")
+icon("aws/compute/elastic-kubernetes-service", 1370, 380, "EKS 1.35 · 2 × t3.medium Spot\nVPC CNI · prefix + custom net.\nNetworkPolicy")
+icon("aws/network/route-53-hosted-zone", 1740, 380, "Private zone\ncloudbridge.internal")
+arrow("M 1222 190 L 1335 190", AWS)
+arrow("M 1405 190 L 1495 190", AWS)
+arrow("M 1150 470 L 1068 440", FW, "all egress → TGW → firewalls", (1220, 492), width=2)
 
 # ---------------- VPN (middle) ----------------
-icon("aws/network/vpn-gateway", 1090, 480, "", size=56)
-parts.append('<text x="1128" y="485" class="vh">VGW · ASN 64512</text>')
-icon("aws/network/site-to-site-vpn", 1090, 580, "", size=64)
-parts.append('<text x="1135" y="568" class="vh">Site-to-Site VPN</text>')
-parts.append('<text x="1135" y="586" class="v">IPsec IKEv2 × 2 tunnels · eBGP 64512 ↔ 65515</text>')
-parts.append('<text x="1135" y="604" class="v">169.254.21.0/30, 169.254.22.0/30 · ~12 ms RTT</text>')
-arrow("M 1082 508 L 1082 548", VPN, width=3, head=False)
-arrow("M 1098 508 L 1098 548", VPN, width=3, head=False)
-arrow("M 1082 612 L 1082 732", VPN, width=3, head=False)
-arrow("M 1098 612 L 1098 732", VPN, width=3, head=False)
+icon("aws/network/site-to-site-vpn", 1030, 612, "", size=60)
+note(1075, 598, "2 VPN connections · 4 IPsec IKEv2 tunnels", "vh")
+note(1075, 616, "eBGP 64512 ↔ 65515 · ECMP both ways · ~12 ms RTT", "v")
+note(1075, 633, "MSS clamped to 1350 (Azure gateway) · path MTU 1422", "v")
+for dx in (-12, -4, 4, 12):
+    arrow(f"M {1030 + dx} 514 L {1030 + dx} 580", VPN, width=2, head=False)
+    arrow(f"M {1030 + dx} 644 L {1030 + dx} 760", VPN, width=2, head=False)
 
 # ---------------- Azure (bottom) ----------------
-box(420, 660, 1340, 440, "Azure · northcentralus (Chicago)", AZURE, "#eef6fd", bold=True)
-box(440, 695, 1000, 385, "VNet 10.20.0.0/16 · cloudbridge-rg", AZURE)
-box(460, 730, 200, 330, "Public entry", "#0f9d9a", "#eefaf9")
-icon("azure/network/public-ip-addresses", 560, 800, "Static public IP")
-icon("azure/network/load-balancers", 560, 940, "Standard LB (public)\nprobe /live")
+box(470, 690, 1400, 500, "Azure · northcentralus (Chicago) · hub and spoke", AZURE, "#eef6fd", bold=True)
 
-box(980, 718, 440, 120, "GatewaySubnet 10.20.255.0/27", "#8c4fff", "#f6f2ff")
-icon("azure/network/virtual-network-gateways", 1090, 772, "VPN gateway\nVpnGw1AZ · ASN 65515", size=56)
-icon("azure/network/local-network-gateways", 1230, 772, "Local network\ngateways ×2", size=56)
-icon("azure/network/connections", 1360, 772, "Connections ×2\nIKEv2 + BGP", size=56)
+box(490, 725, 580, 445, "Hub VNet 10.20.240.0/22", AZURE)
+icon("azure/network/public-ip-addresses", 580, 800, "Public IP + DNS label\n(firewall)", size=50)
+icon("azure/network/virtual-network-gateways", 1030, 800, "VPN gateway\nactive-active · 2 instances\nVpnGw1AZ · ASN 65515", size=56)
+icon("azure/compute/vm", 580, 975, "fw VM · nftables\nDNAT → ILB + SNAT\nSNAT egress · dnsmasq")
+icon("azure/network/dns-private-zones", 830, 975, "Private DNS zones\naz.cloudbridge.internal\nprivatelink.blob")
+arrow("M 580 862 L 580 940", FW, width=2)
 
-box(680, 855, 740, 205, "aks-nodes /22 · aks-pods /19 · AKS 1.35 Free · 2 × B2als_v2 · Azure CNI",
-    "#8c4fff", "#f6f2ff")
-icon("k8s/compute/pod", 770, 935, "frontend ×3")
-icon("k8s/compute/pod", 990, 935, "backend ×3")
-icon("azure/compute/kubernetes-services", 1210, 935, "AKS control plane")
-icon("azure/compute/vm-scale-sets", 1350, 935, "System node pool\n2 × B2als_v2")
+arrow("M 1070 960 L 1150 960", AZURE, width=3, head=False)
+note(1078, 948, "peering", "e2")
 
-box(1460, 695, 280, 385, "Supporting services", GREY, "#ffffff", dash=True)
-icon("azure/compute/container-registries", 1600, 800, "ACR\napp image")
-icon("azure/identity/managed-identities", 1600, 940, "Managed identity\nAcrPull · Network Contrib.")
+box(1150, 725, 700, 445, "AKS spoke VNet 10.20.0.0/20 · UDR 0/0 → hub firewall", AZURE)
+icon("azure/network/load-balancers", 1240, 830, "Internal LB\n10.20.4.10", size=54)
+icon("k8s/compute/pod", 1410, 830, "frontend ×3")
+icon("k8s/compute/pod", 1560, 830, "backend ×3")
+icon("azure/network/private-endpoint", 1750, 830, "Private Endpoint\nBlob (10.20.5.4)", size=54)
+icon("azure/compute/kubernetes-services", 1410, 1020, "AKS 1.35 Free · 1 × B2als_v2\nAzure CNI Overlay + Cilium\npods 10.244.0.0/16 (SNAT)")
+icon("azure/storage/storage-accounts", 1750, 1020, "Storage\nflow logs · probe blob", size=50)
+arrow("M 580 1058 L 580 1140 L 1180 1140 L 1180 830 L 1209 830", FW, "DNAT → ILB", (880, 1132), width=2.5)
+arrow("M 1268 830 L 1375 830", AZURE)
+arrow("M 1445 830 L 1525 830", AZURE)
 
-# Azure request path
-arrow("M 560 856 L 560 900", AZURE)                                  # public IP -> LB
-arrow("M 592 940 L 730 935", AZURE)                                  # LB -> frontend
-arrow("M 805 935 L 950 935", AZURE, "Kubernetes Service", (878, 922))  # frontend -> backend
-
-# ---------------- Route 53 failover ----------------
-arrow("M 322 560 C 420 480, 430 300, 524 290", AWS, "PRIMARY", (345, 455), width=3)
-arrow("M 322 600 C 420 680, 430 800, 524 800", AZURE, "SECONDARY", (345, 720), dashed=True, width=3)
+# ---------------- DNS answers ----------------
+arrow("M 332 400 L 450 400 L 450 40 L 1085 40 L 1085 190 L 1156 190", AWS, "PRIMARY / priority 1 → ALB", (770, 32), width=3)
+arrow("M 332 770 L 450 770 L 450 800 L 551 800", AZURE, "SECONDARY / priority 2", (404, 792), dashed=True, width=3)
 
 # ---------------- Legend ----------------
-parts.append('<text x="40" y="1128" class="g">Orange: AWS request path · Blue: Azure request path · '
-             'Black: IPsec/BGP between the clouds · Dashed boxes: supporting services outside the VNet/VPC</text>')
+parts.append('<text x="470" y="1214" class="g">Orange: AWS user path · Blue: Azure user path · Red: through a firewall · '
+             'Black: 4 IPsec/BGP tunnels · Purple: MindBridge AI (reads only, never changes anything)</text>')
 
 markers = "".join(
     f'<marker id="a-{c[1:]}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" '
     f'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{c}"/></marker>'
-    for c in (AWS, AZURE, VPN, GREY)
+    for c in (AWS, AZURE, VPN, GREY, FW)
 )
 svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}"
      font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif">
@@ -141,13 +155,18 @@ svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewB
   .b {{ font-size: 12px; fill: #545b64; }}
   .bh {{ font-size: 16px; font-weight: 700; fill: #16191f; }}
   .e {{ font-size: 12px; font-weight: 700; text-anchor: middle; paint-order: stroke; stroke: #ffffff; stroke-width: 5px; }}
+  .e2 {{ font-size: 12px; font-weight: 700; fill: #0078d4; }}
   .vh {{ font-size: 14px; font-weight: 700; fill: #16191f; }}
   .v {{ font-size: 12px; fill: #16191f; }}
+  .n {{ font-size: 11.5px; fill: #545b64; }}
+  .nm {{ font-size: 12px; fill: #16191f; }}
   .g {{ font-size: 12px; fill: #545b64; }}
 </style></defs>
 <rect width="{W}" height="{H}" fill="#ffffff"/>
-<text x="40" y="42" class="t">CloudBridge — AWS + Azure with Route 53 failover</text>
+<text x="40" y="42" class="t">CloudBridge: hub-and-spoke on AWS + Azure, DNS with no single point of failure</text>
+<g transform="translate(0,45)">
 {chr(10).join(parts)}
+</g>
 </svg>
 """
 OUT.write_text(svg)

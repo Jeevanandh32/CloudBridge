@@ -1,0 +1,41 @@
+== Test 5 capacity, label=prefix-custom-net, 2026-11-23T21:16:45Z
+-- nodes (MAX_PODS = kubelet max-pods, set when the node launched)
+NODE                                        IP            ZONE         MODE                MAX_PODS   READY
+ip-10-10-0-111.us-east-2.compute.internal   10.10.0.111   us-east-2b   prefix-custom-net   110        True
+ip-10-10-0-15.us-east-2.compute.internal    10.10.0.15    us-east-2a   prefix-custom-net   110        True
+-- ENIs per node
+ip-10-10-0-111.us-east-2.compute.internal: 2 ENIs, 0 secondary IPs, 2 /28 prefixes, subnets: subnet-00d5e796d64d3036d subnet-0c64696d39909de1c
+ip-10-10-0-15.us-east-2.compute.internal: 2 ENIs, 0 secondary IPs, 2 /28 prefixes, subnets: subnet-04d3ae268056afc6c subnet-02965807b42856e29
+-- subnets (free = AvailableIpAddressCount)
+cloudbridge-app-node-a	10.10.0.0/26	56
+cloudbridge-app-node-b	10.10.0.64/26	57
+cloudbridge-app-pod-a	10.10.64.0/19	8154
+cloudbridge-app-pod-b	10.10.96.0/19	8154
+
+step   40  running   40  unschedulable   0  no-IP   0 | per node: ip-10-10-0-111=28;ip-10-10-0-15=28 | free IPs: node-a=56;node-b=57;pod-a=8138;pod-b=8138
+step   80  running   80  unschedulable   0  no-IP   0 | per node: ip-10-10-0-111=48;ip-10-10-0-15=48 | free IPs: node-a=56;node-b=57;pod-a=8122;pod-b=8122
+step  120  running  120  unschedulable   0  no-IP   0 | per node: ip-10-10-0-111=68;ip-10-10-0-15=68 | free IPs: node-a=56;node-b=57;pod-a=8089;pod-b=8089
+step  160  running  160  unschedulable   0  no-IP   0 | per node: ip-10-10-0-111=88;ip-10-10-0-15=88 | free IPs: node-a=56;node-b=57;pod-a=8073;pod-b=8073
+step  200  running  200  unschedulable   0  no-IP   0 | per node: ip-10-10-0-111=108;ip-10-10-0-15=108 | free IPs: node-a=55;node-b=56;pod-a=8073;pod-b=8073
+step  230  running  204  unschedulable  26  no-IP   0 | per node: ip-10-10-0-111=110;ip-10-10-0-15=110 | free IPs: node-a=55;node-b=56;pod-a=8073;pod-b=8073
+           first stuck: Pending (unschedulable) pause-85597cfc4b-56lfw: FailedScheduling: 0/2 nodes are available: 2 Too many pods. no new claims to deallocate; preemption: 0/2 nodes are available: 2 No preemption victims found for incoming pod. 
+step  250  running  204  unschedulable  46  no-IP   0 | per node: ip-10-10-0-111=110;ip-10-10-0-15=110 | free IPs: node-a=55;node-b=56;pod-a=8073;pod-b=8073
+           first stuck: Pending (unschedulable) pause-85597cfc4b-24fg9: FailedScheduling: 0/2 nodes are available: 2 Too many pods. no new claims to deallocate; preemption: 0/2 nodes are available: 2 No preemption victims found for incoming pod. 
+
+-- where the running pause pods got their IPs
+  node-2a 10.10.0.0/26     0 pods
+  node-2b 10.10.0.64/26    0 pods
+  pod-2a 10.10.64.0/19     102 pods
+  pod-2b 10.10.96.0/19     102 pods
+-- ENIs per node at the end
+ip-10-10-0-111.us-east-2.compute.internal: 3 ENIs, 0 secondary IPs, 7 /28 prefixes, subnets: subnet-00d5e796d64d3036d subnet-0c64696d39909de1c
+ip-10-10-0-15.us-east-2.compute.internal: 3 ENIs, 0 secondary IPs, 7 /28 prefixes, subnets: subnet-04d3ae268056afc6c subnet-02965807b42856e29
+-- subnets at the end
+cloudbridge-app-node-a	10.10.0.0/26	55
+cloudbridge-app-node-b	10.10.0.64/26	56
+cloudbridge-app-pod-a	10.10.64.0/19	8073
+cloudbridge-app-pod-b	10.10.96.0/19	8073
+
+Reading it:
+  'Too many pods' (FailedScheduling)            -> per-node max-pods limit (ENIs x IPs per ENI)
+  'failed to assign an IP address' (sandbox)    -> the CNI found no free IP or /28 prefix in the subnet

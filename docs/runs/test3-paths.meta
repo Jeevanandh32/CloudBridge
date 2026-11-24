@@ -1,0 +1,2 @@
+aws_state_before=c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 
+aws_state_after=c0-t1=UP/2 c0-t2=UP/2 c1-t1=UP/2 c1-t2=UP/2 

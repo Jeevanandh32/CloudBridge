@@ -1,0 +1,18 @@
+raw logs on the VM: /var/tmp/cb-multi-1795455169
+flow 1 replies=4133 missed=1 max_gap_s=0.000 gap_start=0.000
+flow 2 replies=4022 missed=108 max_gap_s=22.450 gap_start=1795455284.455
+flow 3 replies=3992 missed=137 max_gap_s=28.692 gap_start=1795455284.500
+flow 4 replies=4133 missed=1 max_gap_s=0.000 gap_start=0.000
+flow 5 replies=4134 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 6 replies=4134 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 7 replies=4134 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 8 replies=4133 missed=1 max_gap_s=0.000 gap_start=0.000
+flow 9 replies=4000 missed=129 max_gap_s=27.027 gap_start=1795455284.526
+flow 10 replies=3980 missed=149 max_gap_s=31.191 gap_start=1795455284.521
+flow 11 replies=4133 missed=1 max_gap_s=0.000 gap_start=0.000
+flow 12 replies=4134 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 13 replies=4134 missed=0 max_gap_s=0.000 gap_start=0.000
+flow 14 replies=3980 missed=149 max_gap_s=31.186 gap_start=1795455284.526
+flow 15 replies=4000 missed=129 max_gap_s=27.031 gap_start=1795455284.521
+flow 16 replies=4133 missed=1 max_gap_s=0.000 gap_start=0.000
+

@@ -1,0 +1,33 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.10.5",
+  "resource_changes": [
+    {
+      "address": "aws_ec2_transit_gateway_route_table_propagation.app_to_inspection[0]",
+      "mode": "managed",
+      "type": "aws_ec2_transit_gateway_route_table_propagation",
+      "name": "app_to_inspection",
+      "index": 0,
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "transit_gateway_attachment_id": "tgw-attach-0app",
+          "transit_gateway_route_table_id": "tgw-rtb-0inspection"
+        },
+        "after_unknown": {
+          "id": true,
+          "resource_id": true,
+          "resource_type": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {}
+      }
+    }
+  ],
+  "configuration": {},
+  "planned_values": {}
+}

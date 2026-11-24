@@ -1,0 +1,90 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.10.5",
+  "resource_changes": [
+    {
+      "address": "aws_instance.fw[0]",
+      "mode": "managed",
+      "type": "aws_instance",
+      "name": "fw",
+      "index": 0,
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "delete",
+          "create"
+        ],
+        "before": {
+          "id": "i-0fwa",
+          "instance_type": "t4g.nano",
+          "private_ip": "10.10.240.40",
+          "source_dest_check": false,
+          "associate_public_ip_address": true,
+          "primary_network_interface_id": "eni-0fwa",
+          "subnet_id": "subnet-0fwa",
+          "user_data_replace_on_change": true,
+          "tags": {
+            "Name": "cloudbridge-fw-a"
+          }
+        },
+        "after": {
+          "id": null,
+          "instance_type": "t4g.micro",
+          "private_ip": "10.10.240.40",
+          "source_dest_check": false,
+          "associate_public_ip_address": true,
+          "primary_network_interface_id": null,
+          "subnet_id": "subnet-0fwa",
+          "user_data_replace_on_change": true,
+          "tags": {
+            "Name": "cloudbridge-fw-a"
+          }
+        },
+        "after_unknown": {
+          "id": true,
+          "primary_network_interface_id": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {},
+        "replace_paths": [
+          [
+            "instance_type"
+          ]
+        ]
+      },
+      "action_reason": "replace_because_cannot_update"
+    },
+    {
+      "address": "aws_route.tgw_to_fw[0]",
+      "mode": "managed",
+      "type": "aws_route",
+      "name": "tgw_to_fw",
+      "index": 0,
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "id": "r-rtb-0tgwa1080289494",
+          "route_table_id": "rtb-0tgwa",
+          "destination_cidr_block": "0.0.0.0/0",
+          "network_interface_id": "eni-0fwa"
+        },
+        "after": {
+          "id": "r-rtb-0tgwa1080289494",
+          "route_table_id": "rtb-0tgwa",
+          "destination_cidr_block": "0.0.0.0/0",
+          "network_interface_id": null
+        },
+        "after_unknown": {
+          "network_interface_id": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {}
+      }
+    }
+  ],
+  "configuration": {},
+  "planned_values": {}
+}

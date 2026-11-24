@@ -1,0 +1,4 @@
+eni-025ba7f5a085e6ed9	fw-b
+eni-03214c7fac6e7cb9a	fw-a
+eni-075ad67e254310c65 tgw-eni-us-east-2a
+eni-0aa3be54fa9317e22 tgw-eni-us-east-2b

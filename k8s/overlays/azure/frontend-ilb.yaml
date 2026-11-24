@@ -1,0 +1,23 @@
+# Internal Standard LB for the frontend on a fixed IP in the spoke's ilb subnet. AKS has no
+# public IP at all (the student quota's 3 are used by the VPN gateway and the firewall):
+# users reach it as internet -> firewall public IP -> DNAT to 10.20.4.10:80 -> this LB -> pods.
+# The three annotations must match terraform/azure/aks output ilb_service_annotations and the
+# firewall's DNAT target (terraform/azure/hub var aks_ilb_ip).
+# The LB probe uses the shallow /live check; the deep /health check belongs to Route 53.
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: cloudbridge
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+    service.beta.kubernetes.io/azure-load-balancer-internal-subnet: "ilb"
+    service.beta.kubernetes.io/azure-load-balancer-ipv4: "10.20.4.10"
+    service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: /live
+spec:
+  type: LoadBalancer
+  # No loadBalancerSourceRanges. Inbound traffic arrives SNATed to the hub firewall's IP (a
+  # VirtualNetwork source), which the default AKS NSG already admits. Found in Session 2:
+  # with the client IP preserved, the ILB (floating IP off) rewrote the destination to the
+  # node IP, the AKS NSG dropped the internet-sourced SYN, and an allow rule on the ILB IP
+  # never matched. See terraform/azure/hub/fw-cloud-init.yaml.tftpl.

@@ -1,0 +1,21 @@
+test1 failover-without-route53: fw-a resolves through unbound with every Route 53 name server dropped
+polls: 304  answered by: azure-dns=304
+Route 53 servers tried per poll (all timed out): mean 0.6
+resolution time: median 260 ms, max 402 ms
+first failed /health      : break + 2.2 s
+answer points at Azure    : break + 36.4 s
+HTTP "cloud":"azure"      : break + 36.4 s  <- failover time, Route 53 unreachable
+failed polls in outage    : 17 of 120
+answer points at AWS again: restore + 14.5 s
+HTTP "cloud":"aws" again  : restore + 14.5 s  <- failback time
+failed polls in failback  : 0 of 164
+health-check view (laptop, ~10 s samples):
+     break + -40.0 s  tm_aws-alb=Online tm_azure-fw=Online  r53hc_aws=16/16 r53hc_azure=16/16 
+      break + 32.9 s  tm_aws-alb=Degraded tm_azure-fw=Online  r53hc_aws=0/15 r53hc_azure=16/16 
+      break + 50.4 s  tm_aws-alb=Degraded tm_azure-fw=Online  r53hc_aws=0/16 r53hc_azure=16/16 
+    restore + 17.9 s  tm_aws-alb=Online tm_azure-fw=Online  r53hc_aws=0/16 r53hc_azure=16/16 
+    restore + 32.4 s  tm_aws-alb=Online tm_azure-fw=Online  r53hc_aws=16/16 r53hc_azure=16/16 
+   restore + 243.3 s  tm_aws-alb=Online tm_azure-fw=Online  r53hc_aws=16/16 r53hc_azure=15/15 
+   restore + 261.1 s  tm_aws-alb=Online tm_azure-fw=Online  r53hc_aws=16/16 r53hc_azure=16/16 
+   restore + 288.1 s  tm_aws-alb=Online tm_azure-fw=Online  r53hc_aws=15/15 r53hc_azure=16/16 
+   restore + 305.0 s  tm_aws-alb=Online tm_azure-fw=Online  r53hc_aws=16/16 r53hc_azure=16/16 

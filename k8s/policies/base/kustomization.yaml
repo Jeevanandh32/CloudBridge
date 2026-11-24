@@ -1,0 +1,8 @@
+# Policies shared by both clusters. Apply a cloud overlay (../aws or ../azure), not this
+# directory: without the frontend ingress rule the load balancer can't reach the frontend.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - default-deny.yaml
+  - allow-dns.yaml
+  - frontend-to-backend.yaml

@@ -1,0 +1,233 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.10.5",
+  "resource_changes": [
+    {
+      "address": "aws_eks_addon.vpc_cni",
+      "mode": "managed",
+      "type": "aws_eks_addon",
+      "name": "vpc_cni",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "addon_name": "vpc-cni",
+          "addon_version": "v1.20.4-eksbuild.1",
+          "cluster_name": "cloudbridge-eks",
+          "resolve_conflicts_on_create": "OVERWRITE",
+          "resolve_conflicts_on_update": "OVERWRITE",
+          "id": "cloudbridge-eks:vpc-cni",
+          "tags": {},
+          "timeouts": null,
+          "configuration_values": "{\"enableNetworkPolicy\":\"true\",\"env\":{\"AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG\":\"false\",\"AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS\":\"10.20.0.0/16\",\"ENABLE_PREFIX_DELEGATION\":\"false\"},\"nodeAgent\":{\"enablePolicyEventLogs\":\"true\"}}"
+        },
+        "after": {
+          "addon_name": "vpc-cni",
+          "addon_version": "v1.20.4-eksbuild.1",
+          "cluster_name": "cloudbridge-eks",
+          "resolve_conflicts_on_create": "OVERWRITE",
+          "resolve_conflicts_on_update": "OVERWRITE",
+          "id": "cloudbridge-eks:vpc-cni",
+          "tags": {},
+          "timeouts": null,
+          "configuration_values": "{\"enableNetworkPolicy\":\"true\",\"env\":{\"AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG\":\"false\",\"AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS\":\"10.20.0.0/16\",\"ENABLE_PREFIX_DELEGATION\":\"true\",\"WARM_PREFIX_TARGET\":\"1\"},\"nodeAgent\":{\"enablePolicyEventLogs\":\"true\"}}"
+        },
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": {}
+      }
+    },
+    {
+      "address": "module.eks.module.eks_managed_node_group[\"spot\"].aws_launch_template.this[0]",
+      "module_address": "module.eks.module.eks_managed_node_group[\"spot\"]",
+      "mode": "managed",
+      "type": "aws_launch_template",
+      "name": "this",
+      "index": 0,
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "id": "lt-0a1b2c3d4e5f60718",
+          "name": "spot-20261123190000000000000001",
+          "update_default_version": true,
+          "metadata_options": [
+            {
+              "http_endpoint": "enabled",
+              "http_put_response_hop_limit": 2,
+              "http_tokens": "required"
+            }
+          ],
+          "latest_version": 1,
+          "default_version": 1,
+          "tag_specifications": [
+            {
+              "resource_type": "instance",
+              "tags": {
+                "Name": "spot",
+                "cloudbridge:pod-ip-mode": "secondary-ip",
+                "cloudbridge:vpc-cni-config": "6a61bfb9230c"
+              }
+            },
+            {
+              "resource_type": "network-interface",
+              "tags": {
+                "Name": "spot",
+                "cloudbridge:pod-ip-mode": "secondary-ip",
+                "cloudbridge:vpc-cni-config": "6a61bfb9230c"
+              }
+            },
+            {
+              "resource_type": "volume",
+              "tags": {
+                "Name": "spot",
+                "cloudbridge:pod-ip-mode": "secondary-ip",
+                "cloudbridge:vpc-cni-config": "6a61bfb9230c"
+              }
+            }
+          ]
+        },
+        "after": {
+          "id": "lt-0a1b2c3d4e5f60718",
+          "name": "spot-20261123190000000000000001",
+          "update_default_version": true,
+          "metadata_options": [
+            {
+              "http_endpoint": "enabled",
+              "http_put_response_hop_limit": 2,
+              "http_tokens": "required"
+            }
+          ],
+          "tag_specifications": [
+            {
+              "resource_type": "instance",
+              "tags": {
+                "Name": "spot",
+                "cloudbridge:pod-ip-mode": "prefix",
+                "cloudbridge:vpc-cni-config": "66466d25107a"
+              }
+            },
+            {
+              "resource_type": "network-interface",
+              "tags": {
+                "Name": "spot",
+                "cloudbridge:pod-ip-mode": "prefix",
+                "cloudbridge:vpc-cni-config": "66466d25107a"
+              }
+            },
+            {
+              "resource_type": "volume",
+              "tags": {
+                "Name": "spot",
+                "cloudbridge:pod-ip-mode": "prefix",
+                "cloudbridge:vpc-cni-config": "66466d25107a"
+              }
+            }
+          ]
+        },
+        "after_unknown": {
+          "latest_version": true,
+          "default_version": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {}
+      }
+    },
+    {
+      "address": "module.eks.module.eks_managed_node_group[\"spot\"].aws_eks_node_group.this[0]",
+      "module_address": "module.eks.module.eks_managed_node_group[\"spot\"]",
+      "mode": "managed",
+      "type": "aws_eks_node_group",
+      "name": "this",
+      "index": 0,
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "cluster_name": "cloudbridge-eks",
+          "node_group_name": "spot-20261123190000000000000002",
+          "capacity_type": "SPOT",
+          "ami_type": "AL2023_x86_64_STANDARD",
+          "instance_types": [
+            "t3.medium",
+            "t3a.medium"
+          ],
+          "scaling_config": [
+            {
+              "desired_size": 2,
+              "max_size": 3,
+              "min_size": 2
+            }
+          ],
+          "update_config": [
+            {
+              "max_unavailable": 1,
+              "max_unavailable_percentage": 0
+            }
+          ],
+          "id": "cloudbridge-eks:spot-20261123190000000000000002",
+          "labels": {
+            "cloudbridge.io/pod-ip-mode": "secondary-ip"
+          },
+          "launch_template": [
+            {
+              "id": "lt-0a1b2c3d4e5f60718",
+              "name": "spot-20261123190000000000000001",
+              "version": "1"
+            }
+          ]
+        },
+        "after": {
+          "cluster_name": "cloudbridge-eks",
+          "node_group_name": "spot-20261123190000000000000002",
+          "capacity_type": "SPOT",
+          "ami_type": "AL2023_x86_64_STANDARD",
+          "instance_types": [
+            "t3.medium",
+            "t3a.medium"
+          ],
+          "scaling_config": [
+            {
+              "desired_size": 2,
+              "max_size": 3,
+              "min_size": 2
+            }
+          ],
+          "update_config": [
+            {
+              "max_unavailable": 1,
+              "max_unavailable_percentage": 0
+            }
+          ],
+          "id": "cloudbridge-eks:spot-20261123190000000000000002",
+          "labels": {
+            "cloudbridge.io/pod-ip-mode": "prefix"
+          },
+          "launch_template": [
+            {
+              "id": "lt-0a1b2c3d4e5f60718",
+              "name": "spot-20261123190000000000000001"
+            }
+          ]
+        },
+        "after_unknown": {
+          "launch_template": [
+            {
+              "version": true
+            }
+          ]
+        },
+        "before_sensitive": {},
+        "after_sensitive": {}
+      }
+    }
+  ],
+  "configuration": {},
+  "planned_values": {}
+}

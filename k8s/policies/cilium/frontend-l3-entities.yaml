@@ -1,0 +1,20 @@
+# OPTIONAL, AKS only, not applied by default (test6 `policy` applies it only with
+# CILIUM_EXTRAS=1 and only if the ciliumnetworkpolicies.cilium.io CRD exists).
+# The same frontend ingress rule as k8s/policies/azure, written with Cilium identities instead
+# of CIDRs: "world" (outside the cluster) and "host" (the node, for kubelet and LB probes).
+# It is additive: Cilium unions it with the standard NetworkPolicies.
+# Limits on AKS (Azure CNI powered by Cilium): L3/L4 CiliumNetworkPolicy works; L7 (HTTP) and
+# FQDN rules need Advanced Container Networking Services (paid), so none are used here.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: frontend-ingress-world
+  namespace: cloudbridge
+spec:
+  endpointSelector:
+    matchLabels: { app: frontend }
+  ingress:
+    - fromEntities: [world, host]
+      toPorts:
+        - ports:
+            - { port: "8080", protocol: TCP }

@@ -1,0 +1,4 @@
+label=break-a-restored start_ms=1795457302514 end_ms=1795457334053 base_port=26000
+10.10.0.10   174/200 ok  (87.0%)   curl exit codes: 0=174 28=26
+10.10.0.74   190/200 ok  (95.0%)   curl exit codes: 0=190 28=10
+(exit 0 = ok, 28 = timeout, 7 = refused, 45 = local port busy)

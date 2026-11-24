@@ -1,0 +1,1257 @@
+# MindBridge topology model for CloudBridge.
+#
+# components  failure units. layer = the Terraform root that owns them, "planned" for
+#             roots not written yet (aws/eks, azure/aks, global/dns), or "external".
+#             tf = resource addresses in that root. "other/root:address" points at a resource
+#             in a different root. An address without an index covers every instance.
+# hops        a step on a path. mode:
+#               failover  any surviving member carries traffic; automatic after recovery_s
+#               pinned    traffic is split across members; losing one breaks its share
+#                         until someone fixes it by hand
+#               single    one member; losing it breaks the hop (or loss_impact of it)
+# flows       business paths with a weight for importance. A flow is either a list of hops,
+#             or a failover between two other flows (primary / standby) with a switch hop.
+#             path = the kind of path (vpn-vpc, vpc-vpc), for hops whose loss depends on it.
+# failure_modes  how a BGP path loses a member: a clean withdrawal or a silent failure.
+#             Components list the modes their loss can take; what-if and precheck report each.
+#
+# Values marked "source: measured 2026-11-23" come from Session 1 (docs/runs/test3-summary.md,
+# test4-summary.md, slowburn-summary.md).
+#
+# builder.py checks this file against the Terraform and overrides facts that the code
+# decides (firewall count, route targets, active-active, defaults of the Test 4 toggles).
+
+version: 1
+
+scoring:
+  # severity = flow weight x impact x recovery penalty
+  recovery_penalty:
+    manual: 10      # someone has to notice and fix it
+    provider: 4     # provider-run HA service; you wait for the cloud to restore it
+    auto_base: 1    # automatic: 1 + recovery_s / auto_per_s, capped
+    auto_per_s: 60
+    auto_cap: 5
+  # Reduced-redundancy window: after traffic has recovered, a failover hop can stay on fewer
+  # members for a long time (an Azure gateway instance took 14 min 20 s to rebuild its tunnels
+  # and BGP). A second failure in that window takes the rest. Extra severity =
+  # flow weight x share of members lost x min(cap, window_s / per_s).
+  reduced_redundancy:
+    per_s: 600      # +1 per 10 min
+    cap: 3
+  bands:            # component total severity
+    high: 60
+    medium: 20
+
+constraints:
+  # Azure for Students quota in northcentralus (docs/plan.md "Limits")
+  azure_public_ips: {limit: 3, used_from_fact: azure_public_ip_count}
+  azure_bseries_vcpu: {limit: 4, used_from_fact: azure_bseries_vcpu_used}
+  budget:
+    total_usd: 25
+    planned_spend_usd: 21     # upper end: 4 sessions x 5 h = $16-19, plus ~$2 fixed DNS/storage
+    remaining_session_hours: 20
+    # extra $/hr allowed = (total - planned) / hours
+
+failure_modes:
+  clean:
+    name: clean withdrawal
+    examples: "BGP config mismatch (wrong peer ASN), admin shutdown, a peer NOTIFICATION, a VPN connection replaced or deleted through the API"
+    effect: "The peer withdraws the routes at once and ECMP rehashes the flows onto the surviving tunnels before users notice."
+  silent:
+    name: silent failure
+    examples: "gateway instance reboot or crash, an endpoint that dies without sending a NOTIFICATION"
+    effect: "Nothing tells the peer: the flows hashed onto the lost tunnels black-hole until the BGP hold timer expires."
+
+recovery_times:
+  bgp_silent_s:
+    value: 30
+    range: [22, 31]
+    source: "measured 2026-11-23 (Test 3, reset of Azure gateway instance0 = 2 of 4 tunnels): 6 of 16 ECMP flows (38 %) had a 22-31 s gap while the BGP hold timer expired; the other 10 never dropped a packet. Replaces the earlier 90 s estimate (upper end of the plan's 30-90 s)."
+    measured_impact: "6 of 16 flows (38 %) for 2 of 4 tunnels lost; the model uses the tunnel share (50 %), ECMP hashing of 16 flows gave 38 %"
+  bgp_clean_withdrawal_s:
+    value: 0
+    source: "measured 2026-11-23 (Test 3, wrong peer ASN on one tunnel with IPsec up, held 3.5 min): the peer rejected the BGP OPEN with a NOTIFICATION, the routes were withdrawn and ECMP moved the flows; 0 of 16 flows lost a packet at 5 pings/s. v1 B1: 0.8 s gap on an admin BGP reset."
+  azure_gw_instance_rebuild_s:
+    value: 860
+    source: "measured 2026-11-23 (Test 3): after the instance0 reset, traffic had recovered in ~30 s, but all 4 tunnels were UP with routes again only after 14 min 20 s. The link ran on 2 of 4 tunnels until then."
+  tgw_route_convergence_s:
+    value: 5
+    range: [2, 10]
+    source: "measured 2026-11-23 (Test 4 break A / restore A): TGW route-table changes are not atomic. After the propagation was removed, 14-20 % of requests still got through in the first seconds; after it was restored, 87-95 % got through in the first seconds, then 100 %. 'A few seconds' each way."
+  appliance_mode_transition_s:
+    value: 840
+    source: "measured 2026-11-23 (Test 4 restore B): re-enabling appliance mode on live traffic re-pinned the TGW's AZ hashing; 22-40 % of new flows succeeded for several minutes (fw-invalid drops 50 -> 404 on fw-a, 39 -> 364 on fw-b) and it was back to 100 % within ~14 min, without intervention."
+  dns_failover_s:
+    value: 40
+    source: "measured 2026-11-23 (Tests 1-2): app loss with Route 53 unreachable failed over in 36.4 s (Test 1, Traffic Manager 10 s probes, TTL 30); app + VPN loss in 41.7 s user-visible (Test 2; Route 53 answered Azure at +40.6 s, Traffic Manager at +35.4 s). v1 (Route 53 only, 60 s alias TTL) measured 77-128.5 s."
+    measured_s: 41.7
+  dns_provider_retry_s:
+    value: 0.14
+    source: "measured 2026-11-23 (Test 1 provider loss): with every Route 53 name server dropped, unbound answered 20/20 from Azure DNS with median +142 ms (cold) / +124 ms (warm infra cache). Adaptive retransmit (~376 ms) and fast server switching, not a full 3 s timeout. Other resolvers may differ."
+  dnsmasq_retry_s:
+    value: 5
+    estimate: true
+    source: "Estimate: dnsmasq marks an upstream dead after a timeout and uses the other listed server."
+  eks_node_loss_s:
+    value: 57
+    source: "v1 Test 3 tuned average 56.8 s of user-visible failures after losing one EKS node (docs/archive/v1/results.md)."
+
+components:
+  # ---------------- AWS hub (terraform/aws/hub) ----------------
+  - id: aws-tgw
+    name: Transit Gateway
+    cloud: aws
+    layer: aws/hub
+    kind: managed
+    recovery_if_lost: provider
+    risk: managed-service
+    tf: [aws_ec2_transit_gateway.tgw]
+
+  - id: tgw-att-inspection
+    name: TGW attachment of the inspection VPC
+    cloud: aws
+    layer: aws/hub
+    kind: managed
+    recovery_if_lost: provider
+    risk: managed-service
+    tf:
+      - aws_ec2_transit_gateway_vpc_attachment.inspection
+      - aws_ec2_transit_gateway_route_table_association.inspection
+      - aws_ec2_transit_gateway_route_table.this["inspection"]
+      - aws_subnet.tgw
+      - aws_route_table.tgw
+      - aws_route_table_association.tgw
+
+  - id: tgw-appliance-mode
+    name: TGW appliance mode on the inspection attachment
+    cloud: aws
+    layer: aws/hub
+    kind: config
+    recovery_if_lost: manual
+    risk: routing-config
+    tf: [aws_ec2_transit_gateway_vpc_attachment.inspection]
+    note: "Keeps both directions of a flow on the same AZ, so the same stateful firewall sees request and reply. Matters for VPC<->VPC flows between AZ-pinned attachments; measured 2026-11-23 to make no difference for VPN<->VPC flows (the VPN attachment has no AZ)."
+    transition_risk:
+      attribute: appliance_mode_support
+      window: appliance_mode_transition_s
+      success_pct: [22, 40]
+      summary: "Changing appliance_mode_support on live traffic, in either direction, re-pins the TGW's AZ hashing: measured up to ~14 min of asymmetric drops (22-40 % of new flows succeeded) when it was re-enabled. Set it at build time; change it only in a maintenance window."
+
+  - id: tgw-rt-spokes-default
+    name: TGW spokes table 0.0.0.0/0 -> inspection
+    cloud: aws
+    layer: aws/hub
+    kind: config
+    recovery_if_lost: manual
+    risk: routing-config
+    tf:
+      - aws_ec2_transit_gateway_route_table.this["spokes"]
+      - aws_ec2_transit_gateway_route.spokes_default
+
+  - id: tgw-rt-vpn-inspection
+    name: TGW vpn table learns the inspection VPC (firewall DNS)
+    cloud: aws
+    layer: aws/hub
+    kind: config
+    recovery_if_lost: manual
+    risk: routing-config
+    tf:
+      - aws_ec2_transit_gateway_route_table_propagation.inspection_to_vpn
+      - aws_ec2_transit_gateway_route_table.this["vpn"]
+
+  - id: fw-a
+    name: AWS firewall fw-a (us-east-2a)
+    cloud: aws
+    layer: aws/hub
+    kind: vm
+    recovery_if_lost: manual
+    risk: pinned-firewall-route
+    tf:
+      - 'aws_instance.fw[0]'
+      - 'aws_route.tgw_to_fw[0]'
+
+  - id: fw-b
+    name: AWS firewall fw-b (us-east-2b)
+    cloud: aws
+    layer: aws/hub
+    kind: vm
+    recovery_if_lost: manual
+    risk: pinned-firewall-route
+    tf:
+      - 'aws_instance.fw[1]'
+      - 'aws_route.tgw_to_fw[1]'
+
+  - id: aws-insp-route-private
+    name: Inspection firewall subnets 10.0.0.0/8 -> TGW
+    cloud: aws
+    layer: aws/hub
+    kind: config
+    recovery_if_lost: manual
+    risk: routing-config
+    tf: [aws_route.fw_private, aws_route_table.fw, aws_route_table_association.fw]
+
+  - id: aws-insp-igw
+    name: Inspection VPC internet gateway (egress NAT path)
+    cloud: aws
+    layer: aws/hub
+    kind: managed
+    recovery_if_lost: provider
+    risk: managed-service
+    tf: [aws_internet_gateway.inspection, aws_route.fw_internet, aws_route_table.fw]
+
+  # ---------------- AWS app spoke (terraform/aws/spoke-app) ----------------
+  - id: tgw-att-app
+    name: TGW attachment of the app spoke
+    cloud: aws
+    layer: aws/spoke-app
+    kind: managed
+    recovery_if_lost: provider
+    risk: managed-service
+    tf:
+      - aws_ec2_transit_gateway_vpc_attachment.app
+      - aws_ec2_transit_gateway_route_table_association.app
+      - aws_subnet.tgw
+      - aws_route_table_association.tgw
+
+  - id: tgw-prop-app-to-inspection
+    name: TGW inspection table learns the app spoke (propagation)
+    cloud: aws
+    layer: aws/spoke-app
+    kind: config
+    recovery_if_lost: manual
+    risk: routing-config
+    tf: [aws_ec2_transit_gateway_route_table_propagation.app_to_inspection]
+    note: "Test 4 break A removes it: the firewalls lose the route back to the spoke."
+
+  - id: tgw-route-vpn-to-app
+    name: TGW vpn table static app CIDRs -> inspection
+    cloud: aws
+    layer: aws/spoke-app
+    kind: config
+    recovery_if_lost: manual
+    risk: routing-config
+    tf:
+      - 'aws_ec2_transit_gateway_route.vpn_to_app'
+      - "aws/hub:aws_ec2_transit_gateway_route_table.this[\"vpn\"]"
+
+  - id: aws-app-private-route
+    name: App private subnets 0.0.0.0/0 -> TGW
+    cloud: aws
+    layer: aws/spoke-app
+    kind: config
+    recovery_if_lost: manual
+    risk: routing-config
+    tf: [aws_route.private_default, aws_route_table.private, aws_route_table_association.node]
+
+  - id: aws-app-igw
+    name: App spoke internet gateway (ALB inbound)
+    cloud: aws
+    layer: aws/spoke-app
+    kind: managed
+    recovery_if_lost: provider
+    risk: managed-service
+    tf: [aws_internet_gateway.app, aws_route.public_default, aws_route_table.public, aws_route_table_association.public]
+
+  - id: aws-s3-interface-endpoint
+    name: S3 interface endpoint (1 AZ only)
+    cloud: aws
+    layer: aws/spoke-app
+    kind: managed
+    recovery_if_lost: manual
+    risk: single-az-endpoint
+    tf: [aws_vpc_endpoint.s3_interface, aws_security_group.s3_interface]
+
+  - id: aws-private-zone
+    name: Route 53 private zone cloudbridge.internal
+    cloud: aws
+    layer: aws/spoke-app
+    kind: managed
+    recovery_if_lost: provider
+    risk: managed-service
+    tf: [aws_route53_zone.internal]
+
+  # ---------------- VPN (terraform/connectivity/vpn) ----------------
+  - id: aws-vpn-c0
+    name: AWS VPN connection c0 (to Azure instance0)
+    cloud: aws
+    layer: connectivity/vpn
+    kind: managed
+    recovery_if_lost: manual
+    risk: vpn-connection
+    failure_modes: [clean, silent]
+    failure_causes:
+      clean: "connection replaced or deleted through the API (Terraform): the BGP sessions are torn down"
+      silent: "the AWS tunnel endpoints fail without a NOTIFICATION"
+    tf:
+      - aws_vpn_connection.azure["c0"]
+      - aws_customer_gateway.azure["c0"]
+      - aws_ec2_transit_gateway_route_table_association.vpn["c0"]
+
+  - id: aws-vpn-c1
+    name: AWS VPN connection c1 (to Azure instance1)
+    cloud: aws
+    layer: connectivity/vpn
+    kind: managed
+    recovery_if_lost: manual
+    risk: vpn-connection
+    failure_modes: [clean, silent]
+    failure_causes:
+      clean: "connection replaced or deleted through the API (Terraform): the BGP sessions are torn down"
+      silent: "the AWS tunnel endpoints fail without a NOTIFICATION"
+    tf:
+      - aws_vpn_connection.azure["c1"]
+      - aws_customer_gateway.azure["c1"]
+      - aws_ec2_transit_gateway_route_table_association.vpn["c1"]
+
+  - id: tgw-prop-vpn-c0
+    name: TGW inspection table learns Azure over c0 (propagation)
+    cloud: aws
+    layer: connectivity/vpn
+    kind: config
+    recovery_if_lost: manual
+    risk: routing-config
+    failure_modes: [clean]
+    failure_causes:
+      clean: "propagation removed: the TGW drops the routes itself (route-table convergence, a few seconds)"
+    requires: [aws-vpn-c0]
+    note: "Tunnels of c0 depend on it: without it the inspection table stops returning traffic over c0, and ECMP moves it to c1."
+    tf:
+      - 'aws_ec2_transit_gateway_route_table_propagation.vpn_to_inspection["c0"]'
+
+  - id: tgw-prop-vpn-c1
+    name: TGW inspection table learns Azure over c1 (propagation)
+    cloud: aws
+    layer: connectivity/vpn
+    kind: config
+    recovery_if_lost: manual
+    risk: routing-config
+    failure_modes: [clean]
+    failure_causes:
+      clean: "propagation removed: the TGW drops the routes itself (route-table convergence, a few seconds)"
+    requires: [aws-vpn-c1]
+    note: "Tunnels of c1 depend on it: without it the inspection table stops returning traffic over c1, and ECMP moves it to c0."
+    tf:
+      - 'aws_ec2_transit_gateway_route_table_propagation.vpn_to_inspection["c1"]'
+
+  - id: vpn-c0-t1
+    name: Tunnel c0-t1 169.254.21.0/30
+    cloud: cross
+    layer: connectivity/vpn
+    kind: managed
+    recovery_if_lost: manual
+    risk: vpn-connection
+    requires: [aws-vpn-c0, az-vpngw-i0, tgw-prop-vpn-c0]
+    failure_modes: [clean, silent]
+    failure_causes:
+      clean: "BGP config mismatch or admin shutdown on this tunnel (Test 3 bgp-break)"
+      silent: "the tunnel's far end dies without a NOTIFICATION"
+    tf:
+      - 'azurerm_local_network_gateway.aws["c0-t1"]'
+      - 'azurerm_virtual_network_gateway_connection.aws["c0-t1"]'
+      - 'random_password.psk["c0-t1"]'
+
+  - id: vpn-c0-t2
+    name: Tunnel c0-t2 169.254.22.0/30
+    cloud: cross
+    layer: connectivity/vpn
+    kind: managed
+    recovery_if_lost: manual
+    risk: vpn-connection
+    requires: [aws-vpn-c0, az-vpngw-i0, tgw-prop-vpn-c0]
+    failure_modes: [clean, silent]
+    failure_causes:
+      clean: "BGP config mismatch or admin shutdown on this tunnel (Test 3 bgp-break)"
+      silent: "the tunnel's far end dies without a NOTIFICATION"
+    tf:
+      - 'azurerm_local_network_gateway.aws["c0-t2"]'
+      - 'azurerm_virtual_network_gateway_connection.aws["c0-t2"]'
+      - 'random_password.psk["c0-t2"]'
+
+  - id: vpn-c1-t1
+    name: Tunnel c1-t1 169.254.21.4/30
+    cloud: cross
+    layer: connectivity/vpn
+    kind: managed
+    recovery_if_lost: manual
+    risk: vpn-connection
+    requires: [aws-vpn-c1, az-vpngw-i1, tgw-prop-vpn-c1]
+    failure_modes: [clean, silent]
+    failure_causes:
+      clean: "BGP config mismatch or admin shutdown on this tunnel (Test 3 bgp-break)"
+      silent: "the tunnel's far end dies without a NOTIFICATION"
+    tf:
+      - 'azurerm_local_network_gateway.aws["c1-t1"]'
+      - 'azurerm_virtual_network_gateway_connection.aws["c1-t1"]'
+      - 'random_password.psk["c1-t1"]'
+
+  - id: vpn-c1-t2
+    name: Tunnel c1-t2 169.254.22.4/30
+    cloud: cross
+    layer: connectivity/vpn
+    kind: managed
+    recovery_if_lost: manual
+    risk: vpn-connection
+    requires: [aws-vpn-c1, az-vpngw-i1, tgw-prop-vpn-c1]
+    failure_modes: [clean, silent]
+    failure_causes:
+      clean: "BGP config mismatch or admin shutdown on this tunnel (Test 3 bgp-break)"
+      silent: "the tunnel's far end dies without a NOTIFICATION"
+    tf:
+      - 'azurerm_local_network_gateway.aws["c1-t2"]'
+      - 'azurerm_virtual_network_gateway_connection.aws["c1-t2"]'
+      - 'random_password.psk["c1-t2"]'
+
+  # ---------------- Azure hub (terraform/azure/hub) ----------------
+  - id: az-vpngw-i0
+    name: Azure VPN gateway instance0
+    cloud: azure
+    layer: azure/hub
+    kind: managed
+    recovery_if_lost: provider
+    risk: vpn-gateway-instance
+    failure_modes: [silent]
+    failure_causes:
+      silent: "instance reboot, crash or platform maintenance (Test 3 instance-down: vnet-gateway reset)"
+    redundancy_window: azure_gw_instance_rebuild_s
+    tf:
+      - 'azurerm_virtual_network_gateway.vpngw'
+      - 'azurerm_public_ip.vpngw["instance0"]'
+
+  - id: az-vpngw-i1
+    name: Azure VPN gateway instance1
+    cloud: azure
+    layer: azure/hub
+    kind: managed
+    recovery_if_lost: provider
+    risk: vpn-gateway-instance
+    failure_modes: [silent]
+    failure_causes:
+      silent: "instance reboot, crash or platform maintenance (Test 3 instance-down: vnet-gateway reset)"
+    redundancy_window: azure_gw_instance_rebuild_s
+    tf:
+      - 'azurerm_virtual_network_gateway.vpngw'
+      - 'azurerm_public_ip.vpngw["instance1"]'
+
+  - id: az-fw
+    name: Azure hub firewall VM (nftables, SNAT, DNAT, DNS)
+    cloud: azure
+    layer: azure/hub
+    kind: vm
+    recovery_if_lost: manual
+    risk: single-firewall-vm-azure
+    tf:
+      - azurerm_linux_virtual_machine.fw
+      - azurerm_network_interface.fw
+      - azurerm_public_ip.fw
+      - azurerm_network_security_group.fw
+      - azurerm_subnet_network_security_group_association.fw
+      - azurerm_subnet.this["fw"]
+
+  - id: az-private-dns
+    name: Azure private DNS zones (az.cloudbridge.internal, privatelink.blob)
+    cloud: azure
+    layer: azure/hub
+    kind: managed
+    recovery_if_lost: provider
+    risk: managed-service
+    tf: [azurerm_private_dns_zone.this, azurerm_private_dns_zone_virtual_network_link.hub]
+
+  - id: az-storage
+    name: Azure Storage account (Private Endpoint target)
+    cloud: azure
+    layer: azure/hub
+    kind: managed
+    recovery_if_lost: provider
+    risk: managed-service
+    tf: [azurerm_storage_account.hub]
+
+  # ---------------- Azure spoke (terraform/azure/spoke-aks) ----------------
+  - id: az-peering
+    name: Hub-spoke VNet peering (gateway transit)
+    cloud: azure
+    layer: azure/spoke-aks
+    kind: config
+    recovery_if_lost: manual
+    risk: routing-config
+    tf: [azurerm_virtual_network_peering.hub_to_spoke, azurerm_virtual_network_peering.spoke_to_hub]
+
+  - id: az-spoke-udr
+    name: Spoke UDR 0.0.0.0/0 -> hub firewall
+    cloud: azure
+    layer: azure/spoke-aks
+    kind: config
+    recovery_if_lost: manual
+    risk: routing-config
+    tf: [azurerm_route_table.spoke, azurerm_subnet_route_table_association.spoke]
+
+  - id: az-gw-udr
+    name: GatewaySubnet UDR spoke -> hub firewall (symmetry)
+    cloud: azure
+    layer: azure/spoke-aks
+    kind: config
+    recovery_if_lost: manual
+    risk: routing-config
+    tf: [azurerm_route_table.gateway, azurerm_subnet_route_table_association.gateway]
+
+  - id: az-blob-pe
+    name: Storage Private Endpoint (spoke)
+    cloud: azure
+    layer: azure/spoke-aks
+    kind: managed
+    recovery_if_lost: manual
+    risk: single-private-endpoint
+    requires: [az-storage]
+    tf: [azurerm_private_endpoint.blob]
+
+  # ---------------- Planned: aws/eks (not yet in code) ----------------
+  - id: eks-node-a
+    name: EKS Spot node in 2a (app pods)
+    cloud: aws
+    layer: planned
+    planned_layer: aws/eks
+    kind: vm
+    recovery_if_lost: manual
+    risk: spot-node
+
+  - id: eks-node-b
+    name: EKS Spot node in 2b (app pods)
+    cloud: aws
+    layer: planned
+    planned_layer: aws/eks
+    kind: vm
+    recovery_if_lost: manual
+    risk: spot-node
+
+  - id: aws-alb
+    name: ALB (made by the AWS LB controller)
+    cloud: aws
+    layer: planned
+    planned_layer: aws/eks
+    kind: managed
+    recovery_if_lost: provider
+    risk: managed-service
+
+  # ---------------- Planned: azure/aks (not yet in code) ----------------
+  - id: aks-node
+    name: AKS node (1 x Standard_B2als_v2)
+    cloud: azure
+    layer: planned
+    planned_layer: azure/aks
+    kind: vm
+    recovery_if_lost: manual
+    risk: single-aks-node
+
+  - id: aks-ilb
+    name: AKS internal load balancer 10.20.4.10
+    cloud: azure
+    layer: planned
+    planned_layer: azure/aks
+    kind: managed
+    recovery_if_lost: provider
+    risk: managed-service
+
+  # ---------------- Planned: global/dns (not yet in code) ----------------
+  - id: dns-route53
+    name: Route 53 public zone name servers
+    cloud: aws
+    layer: planned
+    planned_layer: global/dns
+    kind: managed
+    recovery_if_lost: provider
+    risk: dns-provider
+
+  - id: dns-azure
+    name: Azure DNS public zone name servers
+    cloud: azure
+    layer: planned
+    planned_layer: global/dns
+    kind: managed
+    recovery_if_lost: provider
+    risk: dns-provider
+
+  - id: dns-failover-r53
+    name: Route 53 health checks + failover records
+    cloud: aws
+    layer: planned
+    planned_layer: global/dns
+    kind: managed
+    recovery_if_lost: provider
+    risk: dns-health-check
+    requires: [dns-route53]
+
+  - id: dns-failover-tm
+    name: Traffic Manager priority profile (behind the Azure DNS CNAME)
+    cloud: azure
+    layer: planned
+    planned_layer: global/dns
+    kind: managed
+    recovery_if_lost: provider
+    risk: dns-health-check
+    requires: [dns-azure]
+
+  - id: registrar
+    name: Domain registrar for jeevs.click (name server delegation)
+    cloud: external
+    layer: planned
+    planned_layer: global/dns
+    kind: external
+    recovery_if_lost: provider
+    risk: registrar
+    note: "Holds the delegation to both providers. Auto-renew is off on purpose, so expiry is a manual date to watch."
+
+  # ---------------- Management plane ----------------
+  - id: tf-state-bucket
+    name: Terraform state bucket (S3, versioned, lockfile)
+    cloud: aws
+    layer: bootstrap
+    kind: managed
+    recovery_if_lost: manual
+    risk: state-bucket
+    tf: [aws_s3_bucket.state]
+
+  - id: aws-control-plane
+    name: AWS APIs (us-east-2)
+    cloud: aws
+    layer: external
+    kind: external
+    recovery_if_lost: provider
+    risk: control-plane
+
+  - id: azure-control-plane
+    name: Azure Resource Manager
+    cloud: azure
+    layer: external
+    kind: external
+    recovery_if_lost: provider
+    risk: control-plane
+
+# Measured firewall capacity (source: measured 2026-11-23, slowburn-summary.md). Context for
+# the fw.* detectors; the collector reads conntrack count and max live, per component.
+capacity:
+  fw-a:
+    instance: t4g.nano
+    conntrack_max: 1048576        # nf_conntrack_max read on the instance
+    conntrack_peak: 8600          # peak entries during the connection-table fill (< 1 %)
+    binding_limits: [cpu, pps]
+    source: "measured 2026-11-23: 20 -> 600 new UDP flows/s over 35 min (628,781 flows) peaked at ~8,600 entries. Filling the table would need ~35,000 new flows/s per firewall, so CPU and packet rate bind first."
+  fw-b:
+    instance: t4g.nano
+    conntrack_max: 1048576
+    conntrack_peak: 8600
+    binding_limits: [cpu, pps]
+    source: "measured 2026-11-23, as fw-a"
+  az-fw:
+    instance: Standard_B2ats_v2
+    conntrack_count_sample: 7168  # a conntrack COUNT (entries in use) on the Azure firewall, not its max
+    conntrack_max: null           # not recorded; read live as fw.conntrack_max
+    binding_limits: [cpu, pps]
+    source: "Session 1 recorded 7,168 as an Azure-firewall conntrack count. It was once taken as the table limit; the real AWS limit is 1,048,576 and the Azure limit is read live."
+
+hops:
+  dns-authoritative:
+    name: Public DNS for app.jeevs.click (two providers)
+    mode: failover
+    members: [dns-route53, dns-azure]
+    recovery: dns_provider_retry_s
+  dns-health-failover:
+    name: Health-checked failover AWS -> Azure
+    mode: failover
+    members: [dns-failover-r53, dns-failover-tm]
+    recovery: dns_failover_s
+  aws-app-igw: {name: App spoke IGW, mode: single, members: [aws-app-igw]}
+  aws-alb: {name: ALB, mode: single, members: [aws-alb]}
+  eks-workload:
+    name: EKS app pods (2 Spot nodes)
+    mode: failover
+    members: [eks-node-a, eks-node-b]
+    recovery: eks_node_loss_s
+  az-fw: {name: Azure hub firewall, mode: single, members: [az-fw]}
+  az-peering: {name: Hub-spoke peering, mode: single, members: [az-peering]}
+  aks-ilb: {name: AKS internal LB, mode: single, members: [aks-ilb]}
+  aks-node: {name: AKS node, mode: single, members: [aks-node]}
+  az-spoke-udr: {name: Spoke UDR via firewall, mode: single, members: [az-spoke-udr]}
+  az-gw-udr: {name: GatewaySubnet UDR via firewall, mode: single, members: [az-gw-udr]}
+  vpn-tunnels:
+    name: 4 IPsec tunnels, BGP + ECMP, 2 Azure gateway instances
+    mode: failover
+    members: [vpn-c0-t1, vpn-c0-t2, vpn-c1-t1, vpn-c1-t2]
+    recovery: bgp_silent_s
+    default_failure_mode: silent     # when the cause is not known, assume the hold timer
+    failure_modes:
+      clean: {recovery: bgp_clean_withdrawal_s, impact_factor: 0}   # measured: 0 of 16 flows hit
+      silent: {recovery: bgp_silent_s}                               # measured: flows on lost tunnels, 22-31 s
+  aws-tgw: {name: Transit Gateway, mode: single, members: [aws-tgw]}
+  tgw-route-vpn-to-app: {name: TGW vpn table -> inspection for app CIDRs, mode: single, members: [tgw-route-vpn-to-app]}
+  tgw-att-inspection: {name: Inspection VPC attachment, mode: single, members: [tgw-att-inspection]}
+  appliance-mode:
+    name: Appliance mode (same firewall both ways)
+    mode: single
+    members: [tgw-appliance-mode]
+    loss_impact: 0.5            # VPC<->VPC between AZ-pinned attachments (estimate: no such flow yet)
+    estimate: true
+    loss_note: "VPC<->VPC flows between AZ-pinned attachments: without appliance mode, flows whose two directions hash to different AZs return through the other firewall and nftables drops them as ct state invalid. With 2 AZs about half the flows (estimate; needs a second spoke VPC to measure)."
+    loss_impact_by_path:
+      vpn-vpc: 0.0              # source: measured 2026-11-23 (Test 4 break B): 400/400 ok, all 400 flows symmetric
+    path_notes:
+      vpn-vpc: "VPN<->VPC flow: measured 2026-11-23 with appliance mode off, 400/400 requests ok and all 400 flows symmetric. The VPN attachment has no AZ, so the TGW hashed both directions onto the same inspection AZ."
+  inspection-fw:
+    name: Inspection firewalls fw-a / fw-b (per-AZ static route)
+    mode: pinned           # builder.py confirms from aws_route.tgw_to_fw
+    members: [fw-a, fw-b]
+  aws-insp-route-private: {name: Firewall subnets -> TGW for 10/8, mode: single, members: [aws-insp-route-private]}
+  aws-insp-igw: {name: Inspection IGW (egress), mode: single, members: [aws-insp-igw]}
+  tgw-rt-inspection-app: {name: TGW inspection table -> app spoke, mode: single, members: [tgw-prop-app-to-inspection]}
+  tgw-rt-vpn-inspection: {name: TGW vpn table -> inspection VPC, mode: single, members: [tgw-rt-vpn-inspection]}
+  tgw-att-app: {name: App spoke attachment, mode: single, members: [tgw-att-app]}
+  aws-app-private-route: {name: App private default route -> TGW, mode: single, members: [aws-app-private-route]}
+  tgw-rt-spokes-default: {name: TGW spokes table default -> inspection, mode: single, members: [tgw-rt-spokes-default]}
+  aws-dns-forwarders:
+    name: AWS firewall DNS forwarders (Azure lists both)
+    mode: failover          # builder.py confirms from the Azure cloud-init template
+    members: [fw-a, fw-b]
+    recovery: dnsmasq_retry_s
+  aws-private-zone: {name: cloudbridge.internal private zone, mode: single, members: [aws-private-zone]}
+  az-private-dns: {name: Azure private DNS zones, mode: single, members: [az-private-dns]}
+  s3-interface-endpoint: {name: S3 interface endpoint, mode: single, members: [aws-s3-interface-endpoint]}
+  az-blob-pe: {name: Storage Private Endpoint, mode: single, members: [az-blob-pe]}
+  tf-state-bucket: {name: Terraform state bucket, mode: single, members: [tf-state-bucket]}
+  aws-control-plane: {name: AWS APIs, mode: single, members: [aws-control-plane]}
+  azure-control-plane: {name: Azure Resource Manager, mode: single, members: [azure-control-plane]}
+  registrar: {name: Registrar, mode: single, members: [registrar]}
+
+flows:
+  - id: users-app
+    name: "Users -> app.jeevs.click (AWS active, Azure failover via DNS health checks)"
+    weight: 10
+    failover:
+      primary: aws-ingress
+      standby: azure-ingress
+      switch: dns-health-failover
+
+  - id: aws-ingress
+    name: "Users -> ALB -> EKS (active path)"
+    weight: 5
+    hops: [dns-authoritative, aws-app-igw, aws-alb, eks-workload]
+
+  - id: azure-ingress
+    name: "Users / health checks -> Azure firewall DNAT -> AKS ILB (failover path)"
+    weight: 5
+    hops: [dns-authoritative, az-fw, az-peering, aks-ilb, aks-node]
+
+  - id: azure-to-aws
+    name: "Azure -> AWS private: AKS -> fw -> VPN -> TGW -> fw-a/b -> app spoke, and back"
+    weight: 7
+    path: vpn-vpc
+    hops:
+      - aks-node
+      - az-spoke-udr
+      - az-peering
+      - az-fw
+      - vpn-tunnels
+      - aws-tgw
+      - tgw-route-vpn-to-app
+      - tgw-att-inspection
+      - appliance-mode
+      - inspection-fw
+      - aws-insp-route-private
+      - tgw-rt-inspection-app
+      - tgw-att-app
+      - eks-workload
+      # return
+      - aws-app-private-route
+      - tgw-rt-spokes-default
+      - az-gw-udr
+
+  - id: aws-egress
+    name: "AWS egress: EKS -> TGW -> fw-a/b NAT -> internet"
+    weight: 5
+    hops:
+      - eks-workload
+      - aws-app-private-route
+      - tgw-att-app
+      - aws-tgw
+      - tgw-rt-spokes-default
+      - tgw-att-inspection
+      - inspection-fw
+      - aws-insp-igw
+
+  - id: aks-egress
+    name: "AKS egress: AKS -> UDR -> hub fw SNAT -> internet"
+    weight: 5
+    hops: [aks-node, az-spoke-udr, az-peering, az-fw]
+
+  - id: dns-aws-to-azure
+    name: "Cross-cloud DNS: EKS asks az.cloudbridge.internal -> Azure fw forwarder"
+    weight: 4
+    path: vpn-vpc
+    hops:
+      - eks-workload
+      - aws-app-private-route
+      - tgw-att-app
+      - aws-tgw
+      - tgw-rt-spokes-default
+      - tgw-att-inspection
+      - appliance-mode
+      - inspection-fw
+      - aws-insp-route-private
+      - vpn-tunnels
+      - az-fw
+      - az-private-dns
+      # return
+      - tgw-route-vpn-to-app
+      - tgw-rt-inspection-app
+
+  - id: dns-azure-to-aws
+    name: "Cross-cloud DNS: Azure fw forwarder asks cloudbridge.internal -> AWS fw forwarders"
+    weight: 4
+    hops:
+      - az-fw
+      - vpn-tunnels
+      - aws-tgw
+      - tgw-rt-vpn-inspection
+      - tgw-att-inspection
+      - aws-dns-forwarders
+      - aws-private-zone
+      # return
+      - aws-insp-route-private
+
+  - id: aws-to-azure-blob
+    name: "Private access: EKS -> Azure Storage Private Endpoint over the VPN"
+    weight: 2
+    path: vpn-vpc
+    hops:
+      - eks-workload
+      - aws-app-private-route
+      - tgw-att-app
+      - aws-tgw
+      - tgw-rt-spokes-default
+      - tgw-att-inspection
+      - appliance-mode
+      - inspection-fw
+      - aws-insp-route-private
+      - vpn-tunnels
+      - az-gw-udr
+      - az-fw
+      - az-peering
+      - az-blob-pe
+      # return
+      - tgw-route-vpn-to-app
+      - tgw-rt-inspection-app
+
+  - id: azure-to-s3
+    name: "Private access: AKS -> S3 interface endpoint over the VPN"
+    weight: 2
+    path: vpn-vpc
+    hops:
+      - aks-node
+      - az-spoke-udr
+      - az-peering
+      - az-fw
+      - vpn-tunnels
+      - aws-tgw
+      - tgw-route-vpn-to-app
+      - tgw-att-inspection
+      - appliance-mode
+      - inspection-fw
+      - aws-insp-route-private
+      - tgw-rt-inspection-app
+      - tgw-att-app
+      - s3-interface-endpoint
+      # return
+      - aws-app-private-route
+      - tgw-rt-spokes-default
+      - az-gw-udr
+
+  - id: change-path
+    name: "Management: terraform plan/apply (state bucket + both control planes)"
+    weight: 4
+    hops: [tf-state-bucket, aws-control-plane, azure-control-plane]
+
+  - id: domain-control
+    name: "Management: name server delegation and domain renewal"
+    weight: 3
+    hops: [registrar]
+
+fixes:
+  single-firewall-vm-azure:
+    - mitigation: "Second firewall VM behind an Azure internal Standard LB (HA ports), UDRs to the LB frontend"
+      usd_per_hr: 0.045
+      needs: {azure_bseries_vcpu: 2, azure_public_ips: 1}
+    - mitigation: "Azure Firewall Basic instead of the VM"
+      usd_per_hr: 0.40
+      needs: {azure_public_ips: 1}
+    - mitigation: "Keep the single VM; add a VM health alert and a scripted rebuild (terraform apply -replace) in the runbook to cut recovery time"
+      usd_per_hr: 0.0
+      needs: {}
+  pinned-firewall-route:
+    - mitigation: "Gateway Load Balancer + GWLB endpoints per AZ: TGW subnet routes point at the endpoint, GWLB health checks move flows to the surviving firewall"
+      usd_per_hr: 0.04
+      needs: {}
+    - mitigation: "Health-check script (Lambda or cron on the other firewall) that repoints the dead AZ's TGW-subnet route to the surviving firewall's ENI"
+      usd_per_hr: 0.0
+      needs: {}
+    - mitigation: "AWS Network Firewall (managed, multi-AZ)"
+      usd_per_hr: 0.79
+      needs: {}
+  vpn-gateway-instance:
+    - mitigation: "Already active-active: keep the per-connection alarms and the BGP peer alert"
+      usd_per_hr: 0.0
+      needs: {}
+  vpn-connection:
+    - mitigation: "Already 4 tunnels with ECMP; replace one VPN connection at a time (terraform apply -target), never both in one apply"
+      usd_per_hr: 0.0
+      needs: {}
+  single-aks-node:
+    - mitigation: "Second AKS node"
+      usd_per_hr: 0.04
+      needs: {azure_bseries_vcpu: 2}
+    - mitigation: "Accept: AKS only carries the passive copy; DNS failover still needs it, so check it before failover tests"
+      usd_per_hr: 0.0
+      needs: {}
+  spot-node:
+    - mitigation: "Already 2 nodes; use 2+ instance types in the Spot node group so one Spot pool running dry doesn't take both"
+      usd_per_hr: 0.0
+      needs: {}
+  managed-service:
+    - mitigation: "Accept: provider-run multi-AZ service; covered by the cross-cloud DNS failover where it is on the user path"
+      usd_per_hr: 0.0
+      needs: {}
+  routing-config:
+    - mitigation: "Run mindbridge precheck on every plan, and a Reachability Analyzer path check after apply"
+      usd_per_hr: 0.0
+      needs: {}
+  single-az-endpoint:
+    - mitigation: "Add the second AZ's subnet to the S3 interface endpoint"
+      usd_per_hr: 0.01
+      needs: {}
+  single-private-endpoint:
+    - mitigation: "Accept: one Private Endpoint is a regional managed NIC; recreate on loss"
+      usd_per_hr: 0.0
+      needs: {}
+  dns-provider:
+    - mitigation: "Already two providers listed at the registrar; resolvers retry the other one"
+      usd_per_hr: 0.0
+      needs: {}
+  dns-health-check:
+    - mitigation: "Already two independent health-check systems (Route 53, Traffic Manager)"
+      usd_per_hr: 0.0
+      needs: {}
+  registrar:
+    - mitigation: "Registrar transfer lock on, and a calendar reminder well before expiry (auto-renew stays off)"
+      usd_per_hr: 0.0
+      needs: {}
+  state-bucket:
+    - mitigation: "Bucket policy denying s3:DeleteBucket and versioned-object deletes; optional cross-region replication of the state bucket"
+      usd_per_hr: 0.0
+      needs: {}
+  control-plane:
+    - mitigation: "Accept: data paths do not depend on control-plane calls; avoid applies during a provider incident"
+      usd_per_hr: 0.0
+      needs: {}
+
+# ------------------------------------------------------------------ predict mode
+# Read by predict.py and collect.py. Collectors emit samples keyed by their own component ids
+# (a subnet Name tag, a tunnel key, "az-fw->app-host-a", a cluster context). `map` turns those
+# into model components (fnmatch patterns, first match wins; a list means "one of these, not
+# known which"). An id that is already a model component maps to itself. `impact: none` means
+# the signal is not a component failure; `impact_note` then says what it does mean.
+# Detector durations take s/m/h/d suffixes. `threshold_from` reads the threshold from another
+# signal of the same component (e.g. a budget's limit). `gate` runs a signal's detectors only
+# while another signal says they apply (see subnet.free_aligned_28).
+signals:
+  targets:
+    aws_region: us-east-2
+    project_tag: cloudbridge
+    vpn_connections: [cloudbridge-vpn-azure-c0, cloudbridge-vpn-azure-c1]
+    # AWS tunnel inside CIDR -> tunnel component (matches the component names above)
+    tunnel_inside_cidrs:
+      169.254.21.0/30: vpn-c0-t1
+      169.254.22.0/30: vpn-c0-t2
+      169.254.21.4/30: vpn-c1-t1
+      169.254.22.4/30: vpn-c1-t2
+    # Azure BGP neighbor (the AWS inside address) -> tunnel component
+    azure_bgp_peers:
+      169.254.21.1: vpn-c0-t1
+      169.254.22.1: vpn-c0-t2
+      169.254.21.5: vpn-c1-t1
+      169.254.22.5: vpn-c1-t2
+    aws_firewalls: {cloudbridge-fw-a: fw-a, cloudbridge-fw-b: fw-b}
+    azure_rg: cloudbridge-rg
+    azure_vpngw: cloudbridge-vpngw
+    azure_fw_vm: cloudbridge-fw
+    azure_location: northcentralus
+    # Path-probe destinations, pinged from the Azure firewall. Each one is looked up before the
+    # probe runs; one that can't be resolved or found is skipped ("unavailable: target absent")
+    # and gives no loss samples. Session 2 raised a false 100 % loss alarm by pinging the
+    # Session 1 test host 10.10.0.10 with enable_test_hosts = false. The path component is
+    # "az-fw-><name>" (the IP goes in the sample detail). resolve: aws_instance (running EC2
+    # instance by Name tag), eks_pod (a Running, Ready pod by selector, IP in `cidrs`),
+    # k8s_service (a LoadBalancer Service's ingress IP, e.g. an internal LB), static (never
+    # checked: avoid).
+    path_probe_targets:
+      - {name: app-host-a, resolve: aws_instance, tag: cloudbridge-app-host-a, ip: 10.10.0.10}   # Session 1 test hosts
+      - {name: app-host-b, resolve: aws_instance, tag: cloudbridge-app-host-b, ip: 10.10.0.74}   # (enable_test_hosts)
+      # EKS frontend pods, one per AZ: 2a = node subnet 10.10.0.0/26 or pod subnet 10.10.64.0/19
+      # (custom networking), 2b = 10.10.0.64/26 or 10.10.96.0/19
+      - {name: eks-pod-a, resolve: eks_pod, context: cloudbridge-eks, namespace: cloudbridge, selector: app=frontend,
+         cidrs: [10.10.0.0/26, 10.10.64.0/19]}
+      - {name: eks-pod-b, resolve: eks_pod, context: cloudbridge-eks, namespace: cloudbridge, selector: app=frontend,
+         cidrs: [10.10.0.64/26, 10.10.96.0/19]}
+      # An internal load balancer works too, e.g.:
+      # - {name: eks-ilb, resolve: k8s_service, context: cloudbridge-eks, namespace: cloudbridge, service: backend-internal}
+    # Fine loss probe: 200 pings at 0.2 s = 40 s per sample, 0.5 % resolution. Both
+    # destinations run in parallel, and each Run Command does `ping_rounds` back-to-back
+    # rounds, so one invocation every 120 s gives one loss sample per destination per minute.
+    # (Session 1 used 20 pings every 5 min: 5 % steps, too coarse to see a 0 -> 5 % ramp.)
+    ping_count: 200
+    ping_interval_s: 0.2
+    ping_rounds: 2
+    # Seconds between the two CPU / packet counter snapshots on the AWS firewalls (SSM). On the
+    # Azure firewall the snapshots bracket the ping rounds (~80 s).
+    fw_sample_s: 10
+    # Packet-rate limits per firewall, packets/s (rx + tx, all interfaces). Estimates until
+    # Session 2 measures them: on these small VMs CPU and packet rate bind before the
+    # conntrack table does (slowburn-summary.md).
+    fw_pps_limit: {fw-a: 60000, fw-b: 60000, az-fw: 80000}
+    k8s_contexts: [cloudbridge-eks, cloudbridge-aks]
+    eks_cluster_name: cloudbridge-eks
+    domain: jeevs.click
+    aws_budget: cloudbridge-aws
+    azure_budget: cloudbridge-azure
+    nat_port_range: 64512     # nf_nat picks masquerade source ports from 1024-65535
+    # Subnets whose free aligned /28 blocks are counted (one describe-network-interfaces call):
+    # where prefix delegation takes its /28s from. Node subnets in prefix mode, pod subnets
+    # with custom networking.
+    aligned28_subnets: [cloudbridge-app-node-*, cloudbridge-app-pod-*]
+
+  # Seconds between runs in `watch`. Run Command and SSM are slow (20-40 s on Azure), so the AWS
+  # firewalls poll every 5 minutes and the Azure firewall's combined script every 2 minutes.
+  # CloudWatch GetMetricData is billed per metric.
+  collectors:
+    aws_subnets: {interval: 60, timeout: 30}
+    aws_vpn: {interval: 60, timeout: 30}
+    aws_vpn_cloudwatch: {interval: 300, timeout: 30}
+    azure_vpngw: {interval: 120, timeout: 120}
+    aws_firewalls: {interval: 300, timeout: 90}
+    # One combined Run Command (counters + 2 x 40 s loss probes, ~80 s script + 20-40 s Run
+    # Command overhead). There is one Run Command lock per VM, so the counters and the probe
+    # share this single invocation and never collide. Run it in its own `watch --only
+    # azure_firewall` process so it doesn't delay the 1-min collectors.
+    azure_firewall: {interval: 120, timeout: 180}
+    kubernetes: {interval: 60, timeout: 45}
+    aws_spot: {interval: 120, timeout: 30}
+    azure_quotas: {interval: 3600, timeout: 90}
+    domain: {interval: 21600, timeout: 30}
+    budgets: {interval: 3600, timeout: 60}
+
+  defs:
+    subnet.free_ips:
+      unit: count
+      map:
+        cloudbridge-app-pod-a: eks-node-a
+        cloudbridge-app-pod-b: eks-node-b
+        cloudbridge-app-node-a: eks-node-a
+        cloudbridge-app-node-b: eks-node-b
+        cloudbridge-inspection-fw-a: fw-a
+        cloudbridge-inspection-fw-b: fw-b
+        cloudbridge-inspection-tgw-*: tgw-att-inspection
+        cloudbridge-app-tgw-*: tgw-att-app
+        cloudbridge-app-public-*: aws-alb
+      detectors:
+        - {type: time_to_threshold, threshold: 0, direction: down, window: 30m, min_samples: 10,
+           r2_min: 0.8, horizon: 3h, critical: 30m}
+
+    # Prefix delegation needs a whole aligned /28 per ENI slot. Session 2: pods failed with
+    # "failed to assign an IP address" while the /26 node subnets showed 34-49 free IPs: the
+    # scattered secondary IPs left no aligned /28 (free IPs blind, k8s symptoms only). Counted
+    # from every ENI IP and Ipv4Prefix in the subnet, with the 5 AWS-reserved addresses used, so
+    # a /26 has at most 2 (of 4) aligned /28s that can ever be free. Reaching 0 fires at once
+    # (the next prefix allocation fails); a /19 pod subnet (512 blocks) gives a real trend.
+    # gate: only while the cluster has nodes in the mode that draws /28s from that subnet
+    # (node label cloudbridge.io/pod-ip-mode, read by the kubernetes collector).
+    subnet.free_aligned_28:
+      unit: blocks
+      map:
+        cloudbridge-app-node-a: eks-node-a
+        cloudbridge-app-node-b: eks-node-b
+        cloudbridge-app-pod-a: eks-node-a
+        cloudbridge-app-pod-b: eks-node-b
+      gate:
+        signal: k8s.pod_ip_mode
+        max_age: 15m
+        by_component:
+          "cloudbridge-app-node-*": ["cloudbridge-eks:prefix"]
+          "cloudbridge-app-pod-*": ["cloudbridge-eks:prefix-custom-net"]
+      detectors:
+        - {type: time_to_threshold, threshold: 0, direction: down, window: 30m, min_samples: 6,
+           r2_min: 0.6, horizon: 3h, critical: 30m}
+
+    vpn.tunnel_up:                  # AWS VgwTelemetry: UP = 1
+      unit: state
+      detectors: [{type: flap_counter, window: 30m, max_changes: 4}]
+    vpn.accepted_routes:
+      unit: count
+      detectors: [{type: flap_counter, window: 30m, max_changes: 4}]
+    vpn.cw_tunnel_state:            # CloudWatch TunnelState, Minimum per 5 min
+      unit: state
+      detectors: [{type: flap_counter, window: 2h, max_changes: 4}]
+    vpn.cw_data_in: {unit: bytes, detectors: []}     # context: per-tunnel ECMP share
+    vpn.cw_data_out: {unit: bytes, detectors: []}
+
+    azure.bgp_peer_up:
+      unit: state
+      detectors: [{type: flap_counter, window: 30m, max_changes: 4}]
+    azure.bgp_routes_received:
+      unit: count
+      detectors: [{type: flap_counter, window: 30m, max_changes: 4}]
+    azure.learned_routes:
+      unit: count
+      detectors: [{type: flap_counter, window: 30m, max_changes: 4}]
+
+    fw.conntrack_pct:
+      unit: pct
+      detectors:
+        - {type: time_to_threshold, threshold: 90, direction: up, window: 1h, min_samples: 6,
+           r2_min: 0.7, horizon: 3h, critical: 1h}
+    fw.conntrack_count: {unit: count, detectors: []}   # entries in the table (conntrack -C / nf_conntrack_count)
+    fw.conntrack_max: {unit: count, detectors: []}     # table size (nf_conntrack_max), read live per component
+    fw.cpu_pct:                     # busy % of all vCPUs between two /proc/stat snapshots
+      unit: pct
+      detectors:
+        - {type: time_to_threshold, threshold: 85, direction: up, window: 1h, min_samples: 6,
+           r2_min: 0.7, horizon: 2h, critical: 30m}
+    fw.cpu_steal_pct: {unit: pct, detectors: []}       # context: burstable VMs out of CPU credits show steal
+    fw.load1: {unit: load, detectors: []}              # context: /proc/loadavg
+    fw.pps:                         # rx + tx packets/s, all interfaces except lo (/proc/net/dev delta)
+      unit: pps
+      detectors:
+        - {type: time_to_threshold, threshold_from: fw.pps_limit, direction: up, window: 1h, min_samples: 6,
+           r2_min: 0.7, horizon: 2h, critical: 30m}
+    fw.pps_limit: {unit: pps, detectors: []}            # from signals.targets.fw_pps_limit (estimate)
+    fw.nat_ports_pct:               # busiest destination ip:port / nat_port_range
+      unit: pct
+      detectors:
+        - {type: time_to_threshold, threshold: 90, direction: up, window: 1h, min_samples: 6,
+           r2_min: 0.7, horizon: 3h, critical: 1h}
+    fw.snat_entries: {unit: count, detectors: []}
+    fw.nft_drop_total:
+      unit: packets
+      transform: rate_per_min
+      detectors:
+        - {type: baseline_deviation, alpha: 0.1, warmup: 6, k_sigma: 3, min_delta: 5, min_std: 1, k: 2, n: 3}
+    fw.nft_invalid_total:
+      unit: packets
+      transform: rate_per_min
+      detectors:
+        - {type: baseline_deviation, alpha: 0.1, warmup: 6, k_sigma: 3, min_delta: 5, min_std: 1, k: 2, n: 3}
+
+    # Ping from the Azure firewall. One ICMP flow hashes onto one tunnel (ECMP), so the
+    # tunnel is not known: impact lists every tunnel and the AWS firewall of the host's AZ.
+    # Loss: a trend to the 5 % SLO on the fine probe (1-min samples, 0.5 % resolution). The
+    # trend detector needs 10 samples in 15 min, so it stays silent on coarse 5-min data
+    # (Session 1's real samples replay as "not predicted, 0 false alarms", as they should).
+    # beyond_median: "5 % reached" needs the median of the last 3 samples at 5 %, so a single
+    # noisy or 100 % sample (path not up yet) is not a prediction. min_rise: the fit must climb
+    # 2.5 points over the window. Tuned by simulation (300 seeded runs of the 0 -> 8 % ramp:
+    # median lead ~11 min; 1 alert in 300 six-hour runs at a steady 1 % background loss).
+    path.loss_pct:
+      unit: pct
+      map: &path_map
+        "az-fw->app-host-a": [vpn-c0-t1, vpn-c0-t2, vpn-c1-t1, vpn-c1-t2, fw-a]
+        "az-fw->app-host-b": [vpn-c0-t1, vpn-c0-t2, vpn-c1-t1, vpn-c1-t2, fw-b]
+        "az-fw->eks-pod-a": [vpn-c0-t1, vpn-c0-t2, vpn-c1-t1, vpn-c1-t2, fw-a, eks-node-a]
+        "az-fw->eks-pod-b": [vpn-c0-t1, vpn-c0-t2, vpn-c1-t1, vpn-c1-t2, fw-b, eks-node-b]
+        # Session 1 recordings (the fixtures) name the path by IP
+        "az-fw->10.10.0.10": [vpn-c0-t1, vpn-c0-t2, vpn-c1-t1, vpn-c1-t2, fw-a]
+        "az-fw->10.10.0.74": [vpn-c0-t1, vpn-c0-t2, vpn-c1-t1, vpn-c1-t2, fw-b]
+      detectors:
+        - {type: time_to_threshold, threshold: 5, direction: up, window: 15m, min_samples: 10,
+           r2_min: 0.4, min_rise: 2.5, horizon: 30m, critical: 10m, beyond_median: 3, max_spacing: 2m}
+        - {type: baseline_deviation, alpha: 0.05, warmup: 12, k_sigma: 3, min_delta: 4, min_std: 1.5, k: 3, n: 5}
+    path.rtt_ms:
+      unit: ms
+      map: *path_map
+      detectors:
+        - {type: baseline_deviation, alpha: 0.05, warmup: 12, k_sigma: 4, min_delta: 3, min_std: 1, k: 3, n: 5}
+
+    k8s.pending_pods:
+      unit: pods
+      map: {cloudbridge-eks: [eks-node-a, eks-node-b], cloudbridge-aks: aks-node}
+      detectors: [{type: level, threshold: 0, direction: above, k: 3, n: 3, severity: warning}]
+    k8s.node_bad_conditions:
+      unit: conditions
+      map: {"cloudbridge-eks:*a": eks-node-a, "cloudbridge-eks:*b": eks-node-b, "cloudbridge-aks:*": aks-node}
+      detectors: [{type: level, threshold: 0, direction: above, k: 2, n: 2, severity: critical}]
+    k8s.ip_assign_errors:
+      unit: events
+      map: {cloudbridge-eks: [eks-node-a, eks-node-b], cloudbridge-aks: aks-node}
+      detectors: [{type: level, threshold: 0, direction: above, k: 1, n: 1, severity: warning}]
+    k8s.sandbox_failures:
+      unit: events
+      map: {cloudbridge-eks: [eks-node-a, eks-node-b], cloudbridge-aks: aks-node}
+      detectors: [{type: level, threshold: 0, direction: above, k: 2, n: 3, severity: warning}]
+    k8s.spot_events:
+      unit: events
+      map: {cloudbridge-eks: [eks-node-a, eks-node-b]}
+      detectors: [{type: level, threshold: 0, direction: above, k: 1, n: 1, severity: critical}]
+    k8s.pod_ip_mode:                # nodes per VPC CNI pod-IP mode (component "<cluster>:<mode>"); gates subnet.free_aligned_28
+      unit: nodes
+      impact: none
+      detectors: []
+    aws.spot_rebalance:
+      unit: activities
+      map: {"*": [eks-node-a, eks-node-b]}
+      detectors: [{type: level, threshold: 0, direction: above, k: 1, n: 1, severity: warning}]
+
+    quota.azure_public_ips:
+      unit: count
+      impact: none
+      fix_need: azure_public_ips
+      impact_note: "Not a component failure: any new public IP in northcentralus fails to create. Blocks the fixes that need one."
+      detectors: [{type: quota_headroom, limit_from: quota.azure_public_ips.limit, warn_free: 0, critical_free: -1}]
+    quota.azure_public_ips.limit: {unit: count, impact: none, detectors: []}
+    quota.azure_cores:
+      unit: vCPU
+      impact: none
+      fix_need: azure_bseries_vcpu
+      impact_note: "Not a component failure: a new or replacement VM (firewall, AKS node, surge node during an upgrade) fails to create."
+      detectors: [{type: quota_headroom, limit_from: quota.azure_cores.limit, warn_free: 1, critical_free: 0}]
+    quota.azure_cores.limit: {unit: vCPU, impact: none, detectors: []}
+    quota.azure_bs_vcpu:
+      unit: vCPU
+      impact: none
+      fix_need: azure_bseries_vcpu
+      impact_note: "Not a component failure: a new B-series (classic BS family) VM fails to create."
+      detectors: [{type: quota_headroom, limit_from: quota.azure_bs_vcpu.limit, warn_free: 1, critical_free: 0}]
+    quota.azure_bs_vcpu.limit: {unit: vCPU, impact: none, detectors: []}
+    quota.azure_basv2_vcpu:
+      unit: vCPU
+      impact: none
+      fix_need: azure_bseries_vcpu
+      impact_note: "Not a component failure: a new Basv2 VM (B2ats_v2 firewall, B2als_v2 AKS node) fails to create."
+      detectors: [{type: quota_headroom, limit_from: quota.azure_basv2_vcpu.limit, warn_free: 1, critical_free: 0}]
+    quota.azure_basv2_vcpu.limit: {unit: vCPU, impact: none, detectors: []}
+
+    domain.expiry_days:
+      unit: days
+      map: {"*": registrar}
+      detectors: [{type: countdown, warn_days: 30, critical_days: 7}]
+    domain.auto_renew:
+      unit: flag
+      impact: none
+      impact_note: "Policy check: auto-renew must stay off for jeevs.click. Not a failure."
+      detectors: [{type: level, threshold: 0, direction: above, k: 1, n: 1, severity: warning}]
+
+    budget.actual_usd:
+      unit: USD
+      impact: none
+      impact_note: "Not a component failure: at the limit the session stops and everything is destroyed to stay inside the $25 total."
+      detectors:
+        - {type: time_to_threshold, threshold_from: budget.limit_usd, direction: up, window: 7d, min_samples: 3,
+           r2_min: 0.8, horizon: 14d, critical: 2d}
+    budget.forecast_usd:
+      unit: USD
+      impact: none
+      impact_note: "The provider's month-end forecast is over the budget limit."
+      detectors: [{type: level, threshold_from: budget.limit_usd, direction: above, k: 1, n: 1, severity: warning}]
+    budget.limit_usd: {unit: USD, impact: none, detectors: []}

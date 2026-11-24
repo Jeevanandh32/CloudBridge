@@ -1,0 +1,80 @@
+== Test 5 cross-cloud pod networking, 2026-11-23T21:20:50Z
+EKS netshoot pod 10.10.110.23 on node 10.10.0.111    (VPC CNI: the pod IP is a VPC IP)
+AKS netshoot pod 10.244.0.193 on node 10.20.0.4    (Overlay: 10.244.0.0/16, never routed outside the cluster)
+EKS backend pod  10.10.65.164
+
+== 1. AKS pod -> EKS pod IP, direct (expect: works)
+-- ping
+PING 10.10.110.23 (10.10.110.23) 56(84) bytes of data.
+64 bytes from 10.10.110.23: icmp_seq=1 ttl=120 time=13.2 ms
+64 bytes from 10.10.110.23: icmp_seq=2 ttl=120 time=12.8 ms
+64 bytes from 10.10.110.23: icmp_seq=3 ttl=120 time=12.5 ms
+
+--- 10.10.110.23 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 12.526/12.845/13.196/0.274 ms
+  -> exit 0
+-- TCP 5201 (iperf3 listener in the EKS pod)
+Connection to 10.10.110.23 5201 port [tcp/*] succeeded!
+  -> exit 0
+-- HTTP to the EKS backend pod IP
+{"role":"backend","cloud":"aws","pod":"backend-5dfd4586fc-6px4c"}  -> exit 0
+
+-- tcpdump in the EKS pod (the far side):
+   tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+   listening on eth0, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+   21:20:56.557380 IP 10.20.0.4 > 10.10.110.23: ICMP echo request, id 1, seq 1, length 64
+   21:20:57.558204 IP 10.20.0.4 > 10.10.110.23: ICMP echo request, id 1, seq 2, length 64
+   21:20:58.559887 IP 10.20.0.4 > 10.10.110.23: ICMP echo request, id 1, seq 3, length 64
+   21:20:59.158979 IP 10.20.0.4.42932 > 10.10.110.23.5201: Flags [S], seq 3238533312, win 64240, options [mss 1260,sackOK,TS val 1319112424 ecr 0,nop,wscale 7], length 0
+   4 packets captured
+   4 packets received by filter
+   0 packets dropped by kernel
+   
+-- source IPs that arrived at the EKS pod:
+   4 10.20.0.4
+   AKS pod IP is 10.244.0.193, AKS node IP is 10.20.0.4: the source above is the NODE.
+   Cilium SNATs pod traffic leaving the overlay to the node IP, so EKS never sees 10.244.x.
+
+== 2. EKS pod -> AKS pod IP (expect: fails, overlay addresses aren't routed)
+-- ping
+PING 10.244.0.193 (10.244.0.193) 56(84) bytes of data.
+
+--- 10.244.0.193 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2061ms
+
+command terminated with exit code 1
+  -> exit 1
+-- TCP 5201
+nc: connect to 10.244.0.193 port 5201 (tcp) timed out: Operation in progress
+command terminated with exit code 1
+  -> exit 1
+-- tcpdump on the AKS node for host 10.10.110.23: 0 packets (expect 0: nothing arrives)
+-- why: TGW longest-prefix match for 10.244.0.193
+   spokes table:     None      (0.0.0.0/0 -> inspection, i.e. towards the internet NAT)
+   inspection table: None
+   10.244.0.0/16 is not in any TGW table and not advertised over BGP; only 10.20.0.0/20 and
+   10.20.240.0/22 are. Compare 10.20.4.10: spokes table None, inspection None
+
+== 3. EKS pod -> AKS frontend through the internal LB 10.20.4.10 (expect: works)
+{"role":"frontend","cloud":"azure","pod":"frontend-577894c4c4-dwfv8","backend":{"role":"backend","cloud":"azure","pod":"backend-57d7cb9467-7fnhv"}}  -> exit 0
+
+-- tcpdump on the AKS node (the far side):
+   tcpdump: data link type LINUX_SLL2
+   tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+   listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 262144 bytes
+   21:21:48.101746 eth0  In  IP 10.10.110.23.52300 > 10.20.4.10.80: Flags [S], seq 307463494, win 62727, options [mss 1258,sackOK,TS val 1147155871 ecr 0,nop,wscale 7], length 0
+   21:21:48.101771 lxcbee8a68551b1 Out IP 10.10.110.23.52300 > 10.244.0.156.8080: Flags [S], seq 307463494, win 62727, options [mss 1258,sackOK,TS val 1147155871 ecr 0,nop,wscale 7], length 0
+   
+   2 packets captured
+   11 packets received by filter
+   0 packets dropped by kernel
+-- source IPs that arrived at the AKS node:
+   2 10.10.110.23
+   EKS pod IP is 10.10.110.23, EKS node IP is 10.10.0.111: the source above is the POD.
+   The VPC CNI leaves 10.20.0.0/16 out of its SNAT (AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS),
+   and no firewall on the path NATs private-to-private traffic.
+
+Summary: EKS pod IPs are routable VPC addresses, so Azure can call them directly and sees
+them unchanged. AKS overlay pod IPs exist only inside the cluster: AWS reaches AKS through
+the internal LB (a VNet IP), and AKS pods appear in AWS as their node IP.

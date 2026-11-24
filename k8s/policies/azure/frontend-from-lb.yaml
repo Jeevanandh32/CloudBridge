@@ -1,0 +1,23 @@
+# AKS: users arrive as internet -> firewall DNAT (source IP unchanged) -> internal LB
+# 10.20.4.10 -> pod, so the frontend sees the real client IP, plus the Azure LB probe from
+# 168.63.129.16. The internal LB is pass-through and has no address of its own to allow, so
+# the rule is "anything outside the cluster": 0.0.0.0/0 minus the overlay pod CIDR. Cilium
+# never matches cluster pods with an ipBlock anyway (AKS documents that ipBlock can't select
+# pod or node IPs), so in-cluster pods are still denied. Cross-cloud callers (EKS pods via
+# the ILB, Test 5) are allowed too.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-ingress-from-lb
+  namespace: cloudbridge
+spec:
+  podSelector:
+    matchLabels: { app: frontend }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.244.0.0/16]
+      ports:
+        - { protocol: TCP, port: 8080 }

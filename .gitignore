@@ -12,3 +12,7 @@ crash.log
 # Personal study guide: kept local, not published
 PROJECT.md
 PROJECT.pdf
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
