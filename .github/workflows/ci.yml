@@ -1,0 +1,105 @@
+# CI for CloudBridge. Runs on every push and pull request, with no cloud credentials and no
+# cloud resources: every check is offline (format, validate, unit tests, change gate, render).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform:
+    name: Terraform (fmt + validate, ${{ matrix.layer }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        layer:
+          - bootstrap
+          - aws/hub
+          - aws/spoke-app
+          - aws/eks
+          - azure/hub
+          - azure/spoke-aks
+          - azure/aks
+          - connectivity/vpn
+          - global/dns
+          - ops
+    defaults:
+      run:
+        working-directory: terraform/${{ matrix.layer }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.17.0
+      - name: terraform fmt
+        run: terraform fmt -check -diff
+      - name: terraform init (no backend, no credentials)
+        run: terraform init -backend=false -input=false
+      - name: terraform validate
+        run: terraform validate -no-color
+
+  mindbridge:
+    name: MindBridge AI (tests + change gate)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tools/mindbridge/requirements.txt
+      - run: pip install -r mindbridge/requirements.txt pytest
+      - name: Unit tests
+        run: python -m pytest -q mindbridge/tests
+      - name: What-if sweep runs against the real Terraform
+        run: python -m mindbridge --out-dir /tmp/whatif whatif && test -s /tmp/whatif/whatif-report.md
+      - name: Change gate blocks a change that would blackhole traffic
+        # The Test 4 break: removing the app spoke's TGW propagation. precheck must exit 2 (BLOCK).
+        run: |
+          set +e
+          python -m mindbridge precheck mindbridge/tests/fixtures/break-a-propagation.json
+          rc=$?
+          set -e
+          echo "precheck exit code: $rc"
+          test "$rc" -eq 2
+      - name: Change gate passes a harmless change
+        run: python -m mindbridge precheck mindbridge/tests/fixtures/safe-tags-only.json
+
+  kubernetes:
+    name: Kubernetes manifests render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+      - name: kubectl kustomize every overlay and policy set
+        run: |
+          for d in $(find k8s -name kustomization.yaml -exec dirname {} \; | sort); do
+            echo "== $d"
+            kubectl kustomize "$d" > /dev/null
+          done
+
+  scripts:
+    name: Shell scripts (syntax)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash -n on every script
+        run: |
+          rc=0
+          for f in $(git ls-files '*.sh'); do
+            bash -n "$f" && echo "ok  $f" || { echo "FAIL $f"; rc=1; }
+          done
+          exit $rc
