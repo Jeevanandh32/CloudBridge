@@ -271,3 +271,9 @@ Alarms and recovery procedures: [`docs/archive/v1/runbook.md`](docs/archive/v1/r
 - MTU tests measured **1422 bytes AWS → Azure** and **1420 bytes Azure → AWS**. Packet captures observed gateway MSS clamping to **1310/1360**; this project did not configure a manual MSS adjustment.
 - The regional-loss scenarios disable the application and, in Test 5, its private VPN. They do not reproduce every failure mode of an actual cloud-provider regional outage.
 - The node-failure comparison uses one completed default run and two tuned runs: the mean last-error time fell from **88.7 s to 56.8 s**. The **36%** figure refers to this recovery-time measure; failed-request counts fell from 26 to 18 (**31%**).
+
+---
+
+© 2026 Jeevanandh Ravi. All rights reserved. This repository is shared publicly for portfolio
+review: you're welcome to read it and learn from it, but it isn't licensed for reuse or
+redistribution, and the measured results describe my own test runs.
